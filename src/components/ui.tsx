@@ -1,0 +1,97 @@
+import type { ComponentProps, ReactNode } from "react";
+
+export const inputClass =
+  "w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100";
+
+export function Field({ label, children, className }: { label: string; children: ReactNode; className?: string }) {
+  return (
+    <label className={`flex flex-col gap-1 text-sm font-medium text-zinc-700 dark:text-zinc-300 ${className ?? ""}`}>
+      {label}
+      {children}
+    </label>
+  );
+}
+
+export function Input(props: ComponentProps<"input">) {
+  return <input {...props} className={`${inputClass} ${props.className ?? ""}`} />;
+}
+
+export function Select(props: ComponentProps<"select">) {
+  return <select {...props} className={`${inputClass} ${props.className ?? ""}`} />;
+}
+
+export function Card({ title, action, children }: { title?: string; action?: ReactNode; children: ReactNode }) {
+  return (
+    <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+      {(title || action) && (
+        <div className="mb-4 flex items-center justify-between gap-2">
+          {title && <h2 className="text-base font-semibold text-zinc-900 dark:text-zinc-100">{title}</h2>}
+          {action}
+        </div>
+      )}
+      {children}
+    </section>
+  );
+}
+
+export function PageHeader({ title, subtitle }: { title: string; subtitle?: string }) {
+  return (
+    <header className="mb-6">
+      <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">{title}</h1>
+      {subtitle && <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">{subtitle}</p>}
+    </header>
+  );
+}
+
+export function Empty({ children }: { children: ReactNode }) {
+  return <p className="py-6 text-center text-sm text-zinc-500 dark:text-zinc-400">{children}</p>;
+}
+
+export function Skeleton() {
+  return (
+    <div className="animate-pulse space-y-4" aria-busy="true" aria-label="Loading">
+      <div className="h-8 w-48 rounded bg-zinc-200 dark:bg-zinc-800" />
+      <div className="h-40 rounded-2xl bg-zinc-200 dark:bg-zinc-800" />
+      <div className="h-40 rounded-2xl bg-zinc-200 dark:bg-zinc-800" />
+    </div>
+  );
+}
+
+export function Avatar({ name, color }: { name: string; color: string }) {
+  return (
+    <span
+      className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white"
+      style={{ backgroundColor: color }}
+      title={name}
+    >
+      {name.slice(0, 1).toUpperCase()}
+    </span>
+  );
+}
+
+/** A tiny form that posts one id to a Server Action (for toggle / delete buttons). */
+export function IdButton({
+  action,
+  id,
+  extra,
+  label,
+  children,
+  className,
+}: {
+  action: (form: FormData) => Promise<void>;
+  id: string;
+  extra?: Record<string, string>;
+  label: string;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <form action={action} className="contents">
+      <input type="hidden" name="id" value={id} />
+      {extra && Object.entries(extra).map(([k, v]) => <input key={k} type="hidden" name={k} value={v} />)}
+      <button type="submit" aria-label={label} title={label} className={className}>
+        {children}
+      </button>
+    </form>
+  );
+}
