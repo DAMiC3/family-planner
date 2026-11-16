@@ -1,11 +1,10 @@
 "use client";
 
-import { useActionState, useEffect, useRef, type ReactNode } from "react";
-import { useFormStatus } from "react-dom";
-import type { ActionState } from "@/lib/form";
+import { useRef, useState, type FormEvent, type ReactNode } from "react";
+import { errorMessage } from "@/lib/form";
 
 type Props = {
-  action: (prev: ActionState, form: FormData) => Promise<ActionState>;
+  onSubmit: (form: FormData) => Promise<void>;
   children: ReactNode;
   submitLabel: string;
   className?: string;
@@ -13,33 +12,52 @@ type Props = {
   successMessage?: string;
 };
 
-/** A form wired to a Server Action that shows errors and clears itself on success. */
-export function ActionForm({ action, children, submitLabel, className, resetOnSuccess = true, successMessage }: Props) {
-  const [state, formAction] = useActionState(action, {});
+/** A form that runs an async handler, shows errors and clears itself on success. */
+export function ActionForm({ onSubmit, children, submitLabel, className, resetOnSuccess = true, successMessage }: Props) {
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
   const ref = useRef<HTMLFormElement>(null);
 
-  useEffect(() => {
-    if (state.ok && resetOnSuccess) ref.current?.reset();
-  }, [state.at, state.ok, resetOnSuccess]);
+  async function handle(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setPending(true);
+    setError(null);
+    setSaved(false);
+    try {
+      await onSubmit(new FormData(e.currentTarget));
+      if (resetOnSuccess) ref.current?.reset();
+      setSaved(true);
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setPending(false);
+    }
+  }
 
   return (
-    <form ref={ref} action={formAction} className={className ?? "flex flex-col gap-3"}>
+    <form ref={ref} onSubmit={handle} className={className ?? "flex flex-col gap-3"}>
       {children}
       <div className="flex items-center gap-3">
-        <SubmitButton>{submitLabel}</SubmitButton>
-        {state.error && (
+        <Button type="submit" disabled={pending}>
+          {pending ? "Saving…" : submitLabel}
+        </Button>
+        {error && (
           <p role="alert" className="text-sm text-red-600 dark:text-red-400">
-            {state.error}
+            {error}
           </p>
         )}
-        {state.ok && successMessage && <p className="text-sm text-emerald-600 dark:text-emerald-400">{successMessage}</p>}
+        {saved && successMessage && <p className="text-sm text-emerald-600 dark:text-emerald-400">{successMessage}</p>}
       </div>
     </form>
   );
 }
 
-export function SubmitButton({ children, variant = "primary" }: { children: ReactNode; variant?: "primary" | "ghost" | "danger" }) {
-  const { pending } = useFormStatus();
+export function Button({
+  variant = "primary",
+  className,
+  ...props
+}: React.ComponentProps<"button"> & { variant?: "primary" | "ghost" | "danger" }) {
   const styles = {
     primary: "bg-indigo-600 text-white hover:bg-indigo-500",
     ghost: "text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800",
@@ -47,11 +65,45 @@ export function SubmitButton({ children, variant = "primary" }: { children: Reac
   }[variant];
   return (
     <button
-      type="submit"
+      type="button"
+      {...props}
+      className={`rounded-lg px-4 py-2 text-sm font-medium transition disabled:opacity-60 ${styles} ${className ?? ""}`}
+    />
+  );
+}
+
+/** Small icon-style button that runs an async action (toggle / delete). */
+export function ActButton({
+  run,
+  label,
+  children,
+  className,
+}: {
+  run: () => Promise<void>;
+  label: string;
+  children: ReactNode;
+  className?: string;
+}) {
+  const [pending, setPending] = useState(false);
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
       disabled={pending}
-      className={`rounded-lg px-4 py-2 text-sm font-medium transition disabled:opacity-60 ${styles}`}
+      className={`disabled:opacity-50 ${className ?? ""}`}
+      onClick={async () => {
+        setPending(true);
+        try {
+          await run();
+        } catch (e) {
+          alert(errorMessage(e));
+        } finally {
+          setPending(false);
+        }
+      }}
     >
-      {pending ? "Saving…" : children}
+      {children}
     </button>
   );
 }

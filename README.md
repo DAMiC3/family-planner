@@ -3,7 +3,14 @@
 A shared planner for families: calendar, chores/tasks (with points), a shared shopping list and a weekly meal plan.
 One person creates a family and shares an invite code; everyone who joins sees the same planner.
 
-**Stack:** Next.js 16 (App Router, Server Actions, Cache Components) · TypeScript · Tailwind CSS 4 · Supabase (Auth + Postgres).
+**Live app:** https://damic3.github.io/family-planner/
+
+**Stack:** Next.js 16 (static export) · TypeScript · Tailwind CSS 4 · Supabase (Auth, Postgres, Realtime) · hosted on GitHub Pages.
+
+It's a **PWA**: install it on any phone from the browser.
+- **iPhone / iPad (Safari):** Share button → *Add to Home Screen*.
+- **Android (Chrome, Samsung Internet, Edge):** tap *Install app* in the planner, or browser menu → *Install app* / *Add to Home screen*.
+- **Desktop (Chrome / Edge):** install icon in the address bar.
 
 ## Getting started
 
@@ -14,33 +21,36 @@ npm run dev
 ```
 
 Open http://localhost:3000, create an account, then create a family.
+To build exactly what GitHub Pages serves: `BASE_PATH=/family-planner npm run build` (output in `out/`).
 
-## One-time Supabase setup (dashboard)
+## One-time setup
 
-The database lives in the shared **Ideas and equity** project, in its own `family_planner` schema.
+**GitHub** — Settings → Pages → *Build and deployment* → Source: **GitHub Actions**.
+After that, every push to `main` builds and publishes the site (`.github/workflows/deploy.yml`).
 
-1. **Expose the schema** — Project Settings → Data API → *Exposed schemas* → add `family_planner`.
-   Without this, every page fails with "Invalid schema: family_planner".
-2. **Allow redirect URLs** — Authentication → URL Configuration → *Redirect URLs* → add
-   `http://localhost:3000/**` and your deployed URL (e.g. `https://<your-site>.netlify.app/**`).
-   Don't change the *Site URL*: it belongs to the other app in this project.
+**Supabase** (shared **Ideas and equity** project; this app uses its own `family_planner` schema):
+1. Project Settings → Data API → *Exposed schemas* → add `family_planner`.
+2. Authentication → URL Configuration → *Redirect URLs* → add `https://damic3.github.io/family-planner/**`
+   and `http://localhost:3000/**`. Don't change the *Site URL*: it belongs to the other app in this project.
 
 ## Project layout
 
 ```
 src/
-  proxy.ts                  # refreshes the auth session, guards private pages
   app/
     page.tsx, login/        # public pages
     onboarding/             # create or join a family
     (app)/                  # signed-in area: dashboard, calendar, tasks, shopping, meals, family
-    actions/                # Server Actions (all writes go through here)
-    auth/confirm/route.ts   # email-confirmation link handler
-  components/               # shared UI
+    manifest.ts             # PWA manifest
+  components/               # shared UI, session + family providers, install prompt
   lib/
-    supabase/               # server/browser clients + DB types
-    family.ts               # requireUser / requireFamily helpers
+    supabase/               # browser client + DB types
+    planner.ts              # all database writes
+    use-family-query.ts     # data loading with live (realtime) updates
     dates.ts                # timezone-aware date helpers
+public/
+  sw.js                     # service worker (installable + opens offline)
+  icons/                    # app icons
 supabase/migrations/        # SQL schema (already applied to the project)
 ```
 
@@ -52,7 +62,9 @@ supabase/migrations/        # SQL schema (already applied to the project)
 - Signed-out visitors have no access to any `family_planner` table.
 - When you change the schema, add a new file in `supabase/migrations/` and update `src/lib/supabase/types.ts`.
 
-## Deploying (Netlify)
+## How it's built
 
-Netlify detects Next.js automatically. Set the three variables from `.env.example` in the site's environment settings
-(`NEXT_PUBLIC_SITE_URL` = your site's URL), and add the site URL to Supabase redirect URLs (step 2 above).
+The whole app runs in the browser (static export), so it can be hosted for free on GitHub Pages.
+It talks to Supabase directly with the publishable key; **row-level security in the database** is what
+guarantees people only see their own family's data. Changes made by one family member appear on
+everyone else's screen straight away (Supabase Realtime).

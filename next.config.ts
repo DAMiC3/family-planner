@@ -1,9 +1,15 @@
 import type { NextConfig } from "next";
 
+// Static export so the app can be hosted on GitHub Pages.
+// BASE_PATH is "/family-planner" on GitHub Pages and empty for local dev.
+const basePath = process.env.BASE_PATH ?? "";
+
 const nextConfig: NextConfig = {
-  /* config options here */
-  cacheComponents: true,
-  partialPrefetching: true,
+  output: "export",
+  basePath,
+  trailingSlash: true,
+  images: { unoptimized: true },
+  env: { NEXT_PUBLIC_BASE_PATH: basePath },
   turbopack: {
     rules: {
       "*.css": {

@@ -68,30 +68,3 @@ export function Avatar({ name, color }: { name: string; color: string }) {
     </span>
   );
 }
-
-/** A tiny form that posts one id to a Server Action (for toggle / delete buttons). */
-export function IdButton({
-  action,
-  id,
-  extra,
-  label,
-  children,
-  className,
-}: {
-  action: (form: FormData) => Promise<void>;
-  id: string;
-  extra?: Record<string, string>;
-  label: string;
-  children: ReactNode;
-  className?: string;
-}) {
-  return (
-    <form action={action} className="contents">
-      <input type="hidden" name="id" value={id} />
-      {extra && Object.entries(extra).map(([k, v]) => <input key={k} type="hidden" name={k} value={v} />)}
-      <button type="submit" aria-label={label} title={label} className={className}>
-        {children}
-      </button>
-    </form>
-  );
-}
