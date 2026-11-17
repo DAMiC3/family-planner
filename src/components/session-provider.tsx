@@ -14,7 +14,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const supabase = getSupabase();
     supabase.auth.getSession().then(({ data }) => setState({ session: data.session, loading: false }));
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => setState({ session, loading: false }));
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      setState({ session, loading: false });
+      // Ask the browser not to clear this site's storage, so you stay signed in.
+      if (session && navigator.storage?.persist) void navigator.storage.persist().catch(() => {});
+    });
     return () => sub.subscription.unsubscribe();
   }, []);
 

@@ -9,6 +9,10 @@ import { getSupabase } from "@/lib/supabase/client";
 
 type Mode = "code" | "password" | "signup";
 
+// Email codes need the project's email templates to include {{ .Token }}. This Supabase project shares
+// its templates with AutoMark, so code sign-in is switched off for now (password only).
+const CODE_LOGIN = false;
+
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /**
@@ -17,7 +21,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
  * which opens in a different browser (and on iPhone, outside the Home Screen app).
  */
 export function LoginForm() {
-  const [mode, setMode] = useState<Mode>("code");
+  const [mode, setMode] = useState<Mode>(CODE_LOGIN ? "code" : "password");
   const [email, setEmail] = useState("");
   const [codeSent, setCodeSent] = useState(false);
   const [pending, setPending] = useState(false);
@@ -92,29 +96,31 @@ export function LoginForm() {
       if (error) throw error;
       // Supabase returns a user with no identities when the email is already registered.
       if (data.user && data.user.identities?.length === 0) {
-        setMode("code");
+        setMode("password");
         setEmail(addr);
-        setInfo("You already have an account with this email. Sign in with a code or your password.");
+        setInfo("You already have an account with this email (for example from AutoMark). Sign in with that password.");
         return;
       }
       if (data.session) router.replace("/onboarding");
       else {
-        setMode("code");
+        setMode("password");
         setEmail(addr);
-        setInfo("Account created. Confirm your email, then sign in here with a code.");
+        setInfo(
+          "Account created! Open the confirmation email and tap the link (it's branded AutoMark — that's expected). Then come back here and sign in with your password.",
+        );
       }
     });
   }
 
   const tabs: { m: Mode; label: string }[] = [
-    { m: "code", label: "Email code" },
-    { m: "password", label: "Password" },
+    ...(CODE_LOGIN ? [{ m: "code" as Mode, label: "Email code" }] : []),
+    { m: "password", label: "Sign in" },
     { m: "signup", label: "New account" },
   ];
 
   return (
     <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-      <div className="mb-6 grid grid-cols-3 rounded-lg bg-zinc-100 p-1 text-sm font-medium dark:bg-zinc-800">
+      <div className={`mb-6 grid ${CODE_LOGIN ? "grid-cols-3" : "grid-cols-2"} rounded-lg bg-zinc-100 p-1 text-sm font-medium dark:bg-zinc-800`}>
         {tabs.map(({ m, label }) => (
           <button
             key={m}
@@ -172,7 +178,9 @@ export function LoginForm() {
             {pending ? "Please wait…" : mode === "password" ? "Sign in" : "Create account"}
           </Button>
           {mode === "password" && (
-            <p className="text-xs text-zinc-500">Already use AutoMark? Your AutoMark email and password work here too.</p>
+            <p className="text-xs text-zinc-500">
+              You stay signed in on this device until you tap Sign out. Already use AutoMark? The same email and password work here.
+            </p>
           )}
         </form>
       )}
