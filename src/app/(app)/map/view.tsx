@@ -32,13 +32,9 @@ type Mode = "trips" | "route";
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 const PIN_PATH = "M12 0C5.37 0 0 5.2 0 11.6 0 20.3 12 32 12 32s12-11.7 12-20.4C24 5.2 18.63 0 12 0Zm0 6.8a4.8 4.8 0 1 1 0 9.6 4.8 4.8 0 0 1 0-9.6Z";
 
-function pinHtml(color: string, opts: { float?: boolean; badge?: string; label?: string; outline?: string } = {}) {
-  const outline = opts.outline ?? "#fff";
-  return `<div class="${opts.float ? "pin-float" : ""}" style="position:relative;width:30px;height:40px;filter:drop-shadow(0 2px 3px rgba(0,0,0,.35))">
-    <svg width="30" height="40" viewBox="0 0 24 32" aria-hidden="true"><circle cx="12" cy="11.6" r="5" fill="#fff"/><path fill-rule="evenodd" fill="${color}" stroke="${outline}" stroke-width="${opts.outline ? 1.6 : 1.2}" d="${PIN_PATH}"/></svg>
-    ${opts.label ? `<div style="position:absolute;top:6px;left:0;right:0;text-align:center;font:700 11px sans-serif;color:${color}">${esc(opts.label)}</div>` : ""}
-    ${opts.badge ? `<div style="position:absolute;top:-8px;right:-8px;font-size:14px">${opts.badge}</div>` : ""}
-  </div>`;
+/** Every map pin is the Map-tab pin shape: the car's colour, or white when no car is chosen. */
+function pinHtml(color: string) {
+  return `<div style="width:30px;height:40px;filter:drop-shadow(0 1px 2px rgba(0,0,0,.45))"><svg width="30" height="40" viewBox="0 0 24 32" aria-hidden="true"><path fill-rule="evenodd" fill="${color}" d="${PIN_PATH}"/></svg></div>`;
 }
 
 const toLocalInput = (iso: string, tz: string) => `${dateInZone(new Date(iso), tz)}T${formatTime(iso, tz)}`;
@@ -167,7 +163,7 @@ export function MapView() {
           const s = step.stop;
           markers.push(
             L.marker([s.lat, s.lng], {
-              icon: L.divIcon({ className: "", html: pinHtml(color, { label: String(n) }), iconSize: [30, 40], iconAnchor: [15, 40], popupAnchor: [0, -36] }),
+              icon: L.divIcon({ className: "", html: pinHtml(color), iconSize: [30, 40], iconAnchor: [15, 40], popupAnchor: [0, -36] }),
             }).bindPopup(
               `<b>${n}. ${esc(s.title)}</b><br>${s.kind === "pickup" ? "Pick up" : "Drop off"} by ${esc(formatTime(s.at.toISOString(), tz))}<br><a href="${googleMapsPlaceUrl(s)}" target="_blank" rel="noopener">Open in Google Maps</a>`,
             ),
@@ -181,9 +177,7 @@ export function MapView() {
           const car = cars.find((c) => c.id === e.car_id);
           const who = e.assigned_to ? memberById.get(e.assigned_to) : undefined;
           const driver = e.driver_id ? memberById.get(e.driver_id) : undefined;
-          const html = car
-            ? pinHtml(car.color, { badge: driver ? undefined : "❗" })
-            : pinHtml("#FFFFFF", { float: true, outline: "#222222" }); // white = no car yet
+          const html = pinHtml(car ? car.color : "#FFFFFF"); // white = no car yet
           const times = [
             `${formatDay(dateInZone(new Date(e.starts_at), tz))} ${formatTime(e.arrive_by ?? e.starts_at, tz)} drop-off`,
             e.pickup_at ? `${formatTime(e.pickup_at, tz)} pick-up` : "",
