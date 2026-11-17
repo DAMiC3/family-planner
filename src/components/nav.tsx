@@ -11,13 +11,24 @@ import { PinIcon } from "@/components/pin-icon";
 import { Avatar } from "@/components/ui";
 import { channelName, getSupabase } from "@/lib/supabase/client";
 
-export const TABS: { href: string; label: string; short: string; icon: React.ReactNode }[] = [
+type Tab = { href: string; label: string; short: string; icon: React.ReactNode };
+
+const BASE_TABS: Tab[] = [
   { href: "/program", label: "My program", short: "Program", icon: "📋" },
   { href: "/map", label: "Map", short: "Map", icon: <PinIcon size={24} /> },
   { href: "/calendar", label: "Calendar", short: "Calendar", icon: "📅" },
   { href: "/tasks", label: "Tasks", short: "Tasks", icon: "✅" },
-  { href: "/shopping", label: "Shopping", short: "Shop", icon: "🛒" },
 ];
+
+/** Parents get a Manage tab; children and others get their Chores. */
+export function tabsFor(isParent: boolean): Tab[] {
+  return [
+    ...BASE_TABS,
+    isParent
+      ? { href: "/manage", label: "Manage", short: "Manage", icon: "🛠️" }
+      : { href: "/chores", label: "Chores", short: "Chores", icon: "🧹" },
+  ];
+}
 
 /** Live count of unread inbox items for the signed-in user. */
 function useUnreadCount() {
@@ -125,6 +136,8 @@ export function AppChrome({ children }: { children: React.ReactNode }) {
   const active = useActive();
   const unread = useUnreadCount();
   const [adding, setAdding] = useState(false);
+  const { isParent } = useFamily();
+  const TABS = tabsFor(isParent);
 
   return (
     <>
@@ -143,7 +156,14 @@ export function AppChrome({ children }: { children: React.ReactNode }) {
               </Link>
             ))}
           </nav>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
+            <Link
+              href="/shopping"
+              className={`flex h-10 w-10 items-center justify-center rounded-full text-xl hover:bg-zinc-100 ${active("/shopping") ? "bg-zinc-100" : ""}`}
+              aria-label="Shopping list"
+            >
+              🛒
+            </Link>
             <Link href="/inbox" className="relative flex h-10 w-10 items-center justify-center rounded-full text-xl hover:bg-zinc-100" aria-label={`Inbox${unread ? `, ${unread} unread` : ""}`}>
               🔔
               {unread > 0 && (
