@@ -15,12 +15,13 @@ import {
   regenerateInviteCode,
   removeMember,
   revokeInvite,
+  setEventPermission,
   setMemberRole,
   updateFamily,
   updateMyProfile,
 } from "@/lib/planner";
 import { ROLES } from "@/lib/rules";
-import type { Invite, MemberRole } from "@/lib/supabase/types";
+import type { EventPermission, Invite, MemberRole } from "@/lib/supabase/types";
 
 export function FamilyView() {
   const ctx = useFamily();
@@ -61,9 +62,9 @@ export function FamilyView() {
       </div>
       <div className="grid gap-6 md:grid-cols-2">
         <Card title={`Members (${members.length})`}>
-          <ul className="space-y-3">
+          <ul className="space-y-4">
             {members.map((m) => (
-              <li key={m.user_id} className="flex items-center gap-3 text-sm">
+              <li key={m.user_id} className="flex flex-wrap items-center gap-3 text-sm">
                 <Avatar name={m.display_name} color={m.color} />
                 <span className="flex-1 font-medium">
                   {m.display_name}
@@ -73,7 +74,7 @@ export function FamilyView() {
                   <Select
                     aria-label={`Role for ${m.display_name}`}
                     value={m.role}
-                    className="w-28 py-1"
+                    className="w-auto! py-1.5 text-sm"
                     onChange={(e) => setMemberRole(ctx, m.user_id, e.target.value as MemberRole).catch((err) => alert(errorMessage(err)))}
                   >
                     {ROLES.map((r) => (
@@ -84,6 +85,29 @@ export function FamilyView() {
                   </Select>
                 ) : (
                   <RoleBadge role={m.role} />
+                )}
+                {m.role !== "parent" && (
+                  <div className="flex w-full items-center gap-2 pl-9">
+                    <span className="text-muted">Events:</span>
+                    {isParent ? (
+                      <Select
+                        aria-label={`Event permission for ${m.display_name}`}
+                        value={m.event_permission}
+                        className="w-auto! py-1.5 text-sm"
+                        onChange={(e) =>
+                          setEventPermission(ctx, m.user_id, e.target.value as EventPermission).catch((err) => alert(errorMessage(err)))
+                        }
+                      >
+                        <option value="allowed">Can add events</option>
+                        <option value="approval">Needs a parent&apos;s approval</option>
+                        <option value="blocked">Can&apos;t add events</option>
+                      </Select>
+                    ) : (
+                      <span>
+                        {m.event_permission === "allowed" ? "can add" : m.event_permission === "approval" ? "needs approval" : "can't add"}
+                      </span>
+                    )}
+                  </div>
                 )}
                 {isParent && m.user_id !== me.user_id && (
                   <ActButton
@@ -100,8 +124,9 @@ export function FamilyView() {
             ))}
           </ul>
           <p className="mt-4 text-xs text-zinc-500">
-            <strong>Parents</strong> manage the family, rules and activity slots. <strong>Children</strong> and{" "}
-            <strong>others</strong> can be limited with house rules.
+            <strong>Parents</strong> can change any event and manage the family. <strong>Children</strong> and{" "}
+            <strong>others</strong> can only change their own events (or ones they were invited to share), and can be limited
+            with the event setting above and house rules.
           </p>
           <Link href="/rules" className="mt-3 inline-block text-sm font-medium text-brand-600">
             {isParent ? "Manage house rules →" : "See house rules →"}

@@ -3,12 +3,14 @@
 import { useState } from "react";
 import { ActButton, ActionForm, Button } from "@/components/action-form";
 import { useFamily } from "@/components/family-provider";
+import { EventSheet, StatusBadge } from "@/components/add-event-sheet";
 import { SlotCard } from "@/components/slot-card";
 import { Avatar, Input, PageHeader, Select, Skeleton } from "@/components/ui";
 import { addDays, dateInZone, formatDay, formatTime, startOfWeek, todayInZone, zonedLocalToUtcIso } from "@/lib/dates";
 import { check } from "@/lib/form";
 import { shortAddress } from "@/lib/geo";
-import { MEAL_TYPES, addMeal, deleteEvent, deleteMeal } from "@/lib/planner";
+import { MEAL_TYPES, addMeal, deleteMeal, setEventStatus } from "@/lib/planner";
+import type { CalendarEvent } from "@/lib/supabase/types";
 import { loadSlotExtras } from "@/lib/slot-data";
 import { useFamilyQuery } from "@/lib/use-family-query";
 
@@ -22,8 +24,8 @@ export function CalendarView() {
   const today = todayInZone(tz);
   const [weekStart, setWeekStart] = useState(() => startOfWeek(today));
   const [mealDay, setMealDay] = useState<string | null>(null);
+  const [openEvent, setOpenEvent] = useState<CalendarEvent | null>(null);
   const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
-  const blockedEvents = ctx.blockedBy("events");
   const blockedMeals = ctx.blockedBy("meals");
 
   const { data, error, reload } = useFamilyQuery(
@@ -43,7 +45,7 @@ export function CalendarView() {
       return { events: events.data!, meals: meals.data!, ...(await loadSlotExtras(c, events.data!)) };
     },
     [weekStart, tz],
-    ["events", "meals", "activity_requests", "activity_votes"],
+    ["events", "meals", "activity_requests", "activity_votes", "event_invites"],
   );
 
   const memberById = new Map(members.map((m) => [m.user_id, m]));
@@ -90,32 +92,42 @@ export function CalendarView() {
                     }
                     const who = e.assigned_to ? memberById.get(e.assigned_to) : undefined;
                     const driver = e.driver_id ? memberById.get(e.driver_id) : undefined;
+                    const invited = data.invites.filter((i) => i.event_id === e.id && i.status !== "declined");
                     return (
-                      <li key={e.id} className="flex items-start gap-3">
-                        <span className="w-12 shrink-0 pt-0.5 text-sm font-semibold tabular-nums">
-                          {e.all_day ? "All day" : formatTime(e.starts_at, tz)}
-                        </span>
-                        <div className="min-w-0 flex-1">
-                          <p className="font-medium">{e.title}</p>
-                          {e.location && <p className="truncate text-sm text-muted">📍 {shortAddress(e.location)}</p>}
-                          {e.lat != null && (
-                            <p className="text-sm text-muted">{driver ? `🚗 ${driver.display_name}` : <span className="text-brand-600">🚗 Needs a driver</span>}</p>
-                          )}
-                        </div>
-                        {who && <Avatar name={who.display_name} color={who.color} />}
-                        {!blockedEvents && (
-                          <ActButton
-                            run={async () => {
-                              if (confirm(`Delete "${e.title}"?`)) {
-                                await deleteEvent(ctx, e.id);
-                                await reload();
-                              }
-                            }}
-                            label="Delete"
-                            className="px-1 text-muted hover:text-red-600"
-                          >
-                            ✕
-                          </ActButton>
+                      <li key={e.id} className={e.status === "declined" ? "opacity-50" : ""}>
+                        <button type="button" onClick={() => setOpenEvent(e)} className="flex w-full items-start gap-3 text-left">
+                          <span className="w-12 shrink-0 pt-0.5 text-sm font-semibold tabular-nums">
+                            {e.all_day ? "All day" : formatTime(e.starts_at, tz)}
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <p className="font-medium">
+                              {e.title} <StatusBadge event={e} />
+                            </p>
+                            {e.location && <p className="truncate text-sm text-muted">📍 {shortAddress(e.location)}</p>}
+                            {e.lat != null && e.status === "approved" && (
+                              <p className="text-sm text-muted">{driver ? `🚗 ${driver.display_name}` : <span className="text-brand-600">🚗 Needs a driver</span>}</p>
+                            )}
+                            {invited.length > 0 && (
+                              <p className="text-sm text-muted">
+                                👥 {invited.map((i) => memberById.get(i.user_id)?.display_name).filter(Boolean).join(", ")}
+                              </p>
+                            )}
+                          </div>
+                          {who && <Avatar name={who.display_name} color={who.color} />}
+                        </button>
+                        {ctx.isParent && e.status === "pending" && (
+                          <div className="mt-2 flex gap-2 pl-[60px]">
+                            <ActButton
+                              run={() => setEventStatus(ctx, e.id, "approved")}
+                              label="Approve"
+                              className="rounded-full bg-brand-600 px-3 py-1 text-sm font-semibold text-white"
+                            >
+                              Approve
+                            </ActButton>
+                            <ActButton run={() => setEventStatus(ctx, e.id, "declined")} label="Decline" className="rounded-full border border-line px-3 py-1 text-sm font-semibold">
+                              Decline
+                            </ActButton>
+                          </div>
                         )}
                       </li>
                     );
@@ -169,9 +181,10 @@ export function CalendarView() {
               </section>
             );
           })}
-          <p className="pt-2 text-center text-sm text-muted">Tap the red + at the top to add an event.</p>
+          <p className="pt-2 text-center text-sm text-muted">Tap an event to open it · tap the red + to add one.</p>
         </div>
       )}
+      <EventSheet open={openEvent !== null} event={openEvent} invites={data?.invites ?? []} onClose={() => setOpenEvent(null)} />
     </>
   );
 }

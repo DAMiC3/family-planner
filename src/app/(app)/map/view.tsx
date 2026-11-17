@@ -39,6 +39,7 @@ export function MapView() {
         .select("*")
         .eq("family_id", family.id)
         .not("lat", "is", null)
+        .eq("status", "approved")
         .gte("starts_at", zonedLocalToUtcIso(from, tz))
         .lt("starts_at", zonedLocalToUtcIso(to, tz))
         .order("starts_at");

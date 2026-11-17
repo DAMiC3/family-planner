@@ -1,15 +1,18 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { ActButton } from "@/components/action-form";
 import { useFamily } from "@/components/family-provider";
 import { InstallPrompt } from "@/components/pwa";
+import { EventSheet, StatusBadge } from "@/components/add-event-sheet";
 import { SlotCard } from "@/components/slot-card";
 import { Card, Empty, PageHeader, RoleBadge, Skeleton } from "@/components/ui";
 import { addDays, dateInZone, formatDay, formatTime, todayInZone, zonedLocalToUtcIso } from "@/lib/dates";
 import { check } from "@/lib/form";
 import { shortAddress } from "@/lib/geo";
-import { toggleTask } from "@/lib/planner";
+import { respondToInvite, toggleTask } from "@/lib/planner";
+import type { CalendarEvent } from "@/lib/supabase/types";
 import { describeRule, ruleAppliesTo } from "@/lib/rules";
 import { loadSlotExtras } from "@/lib/slot-data";
 import { useFamilyQuery } from "@/lib/use-family-query";
@@ -29,7 +32,7 @@ export function ProgramView() {
           .from("events")
           .select("*")
           .eq("family_id", family.id)
-          .or(`assigned_to.is.null,assigned_to.eq.${userId},driver_id.eq.${userId}`)
+          .neq("status", "declined")
           .gte("starts_at", zonedLocalToUtcIso(today, tz))
           .lt("starts_at", zonedLocalToUtcIso(addDays(today, 7), tz))
           .order("starts_at"),
@@ -44,13 +47,22 @@ export function ProgramView() {
         c.supabase.from("meals").select("*").eq("family_id", family.id).gte("date", today).lte("date", addDays(today, 6)),
       ]);
       [events, tasks, meals].forEach((r) => check(r.error));
-      return { events: events.data!, tasks: tasks.data!, meals: meals.data!, ...(await loadSlotExtras(c, events.data!)) };
+      const extras = await loadSlotExtras(c, events.data!);
+      const invitedTo = new Set(extras.invites.filter((i) => i.user_id === userId && i.status !== "declined").map((i) => i.event_id));
+      // Mine: for everyone, for me, I drive, I made it, or I'm invited.
+      const mine = events.data!.filter(
+        (e) =>
+          e.assigned_to === null || e.assigned_to === userId || e.driver_id === userId || e.created_by === userId || invitedTo.has(e.id),
+      );
+      return { events: mine, tasks: tasks.data!, meals: meals.data!, ...extras };
     },
     [today, tz, userId],
-    ["events", "tasks", "meals", "activity_requests", "activity_votes"],
+    ["events", "tasks", "meals", "activity_requests", "activity_votes", "event_invites"],
   );
 
+  const [openEvent, setOpenEvent] = useState<CalendarEvent | null>(null);
   const myRules = ctx.rules.filter((r) => ruleAppliesTo(r, me));
+  const pendingInvites = data?.invites.filter((i) => i.user_id === userId && i.status === "pending") ?? [];
   const myTasks = data?.tasks.filter((t) => t.assigned_to === userId) ?? [];
   const openTasks = data?.tasks.filter((t) => t.assigned_to === null) ?? [];
 
@@ -77,6 +89,33 @@ export function ProgramView() {
         )}
       </div>
       {error && <p role="alert" className="mb-4 text-sm text-red-600">{error}</p>}
+      {data && pendingInvites.length > 0 && (
+        <div className="mb-6 space-y-2">
+          {pendingInvites.map((inv) => {
+            const e = data.events.find((x) => x.id === inv.event_id);
+            if (!e) return null;
+            const from = ctx.members.find((m) => m.user_id === inv.invited_by)?.display_name ?? "Someone";
+            return (
+              <div key={inv.event_id} className="flex flex-wrap items-center gap-3 rounded-2xl border border-brand-200 bg-brand-50 p-4">
+                <div className="min-w-0 flex-1">
+                  <p className="font-semibold">📨 {from} invited you to {e.title}</p>
+                  <p className="text-sm text-muted">
+                    {formatDay(dateInZone(new Date(e.starts_at), tz), { weekday: "long" })}
+                    {e.all_day ? "" : ` · ${formatTime(e.starts_at, tz)}`}
+                    {e.invitees_can_edit ? " · you'll be able to change it" : " · view only"}
+                  </p>
+                </div>
+                <ActButton run={() => respondToInvite(ctx, e.id, "accepted")} label="Accept" className="rounded-xl bg-brand-600 px-4 py-2 font-semibold text-white">
+                  Accept
+                </ActButton>
+                <ActButton run={() => respondToInvite(ctx, e.id, "declined")} label="Decline" className="rounded-xl border border-line bg-white px-4 py-2 font-semibold">
+                  Decline
+                </ActButton>
+              </div>
+            );
+          })}
+        </div>
+      )}
       {!data ? (
         <Skeleton />
       ) : (
@@ -101,16 +140,19 @@ export function ProgramView() {
                             <SlotCard slot={e} requests={data.requests.filter((r) => r.event_id === e.id)} votes={data.votes} ctx={ctx} reload={reload} />
                           </li>
                         ) : (
-                          <li key={e.id} className="flex gap-3">
-                            <span className="w-16 shrink-0 tabular-nums text-zinc-500">{e.all_day ? "All day" : formatTime(e.starts_at, tz)}</span>
+                          <li key={e.id}>
+                            <button type="button" onClick={() => setOpenEvent(e)} className="flex w-full gap-3 text-left">
+                            <span className="w-16 shrink-0 tabular-nums text-muted">{e.all_day ? "All day" : formatTime(e.starts_at, tz)}</span>
                             <span className="min-w-0 flex-1">
                               {e.title}
                               {e.assigned_to === null && <span className="ml-1 text-xs text-muted">(everyone)</span>}
                               {e.driver_id === userId && (
                                 <span className="ml-2 rounded-full bg-brand-600 px-2 py-0.5 text-[11px] font-bold text-white">🚗 YOU DRIVE</span>
                               )}
+                              {e.status === "pending" && <span className="ml-2"><StatusBadge event={e} /></span>}
                               {e.location && <span className="block truncate text-muted">📍 {shortAddress(e.location)}</span>}
                             </span>
+                            </button>
                           </li>
                         ),
                       )}
@@ -164,6 +206,7 @@ export function ProgramView() {
           </div>
         </div>
       )}
+      <EventSheet open={openEvent !== null} event={openEvent} invites={data?.invites ?? []} onClose={() => setOpenEvent(null)} />
     </>
   );
 }

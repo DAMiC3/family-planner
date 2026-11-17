@@ -4,7 +4,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useFamily, type FamilyContextValue } from "@/components/family-provider";
 import { channelName } from "@/lib/supabase/client";
 
-type LiveTable = "events" | "tasks" | "shopping_items" | "meals" | "activity_requests" | "activity_votes";
+type LiveTable =
+  | "events"
+  | "tasks"
+  | "shopping_items"
+  | "meals"
+  | "activity_requests"
+  | "activity_votes"
+  | "event_invites";
 
 /**
  * Runs `query` for the current family and re-runs it whenever `deps` change or

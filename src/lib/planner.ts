@@ -8,7 +8,14 @@ import { getSupabase } from "@/lib/supabase/client";
 import { FieldError, check, isoDate, requiredStr, str, uuid } from "@/lib/form";
 import { isValidTimeZone, zonedLocalToUtcIso } from "@/lib/dates";
 import type { Place } from "@/lib/geo";
-import type { MealType, MemberRole, RuleArea } from "@/lib/supabase/types";
+import type {
+  CalendarEvent,
+  EventInvite,
+  EventPermission,
+  MealType,
+  MemberRole,
+  RuleArea,
+} from "@/lib/supabase/types";
 
 export const MEAL_TYPES: MealType[] = ["breakfast", "lunch", "dinner", "snack"];
 const COLOR_RE = /^#[0-9a-fA-F]{6}$/;
@@ -85,10 +92,9 @@ export function announceChange() {
   if (typeof window !== "undefined") window.dispatchEvent(new Event("planner:changed"));
 }
 
-export async function addEvent(ctx: FamilyContextValue, form: FormData, place: Place | null) {
+/** Read the shared fields of the event sheet (add + edit). */
+function eventFields(ctx: FamilyContextValue, form: FormData, place: Place | null) {
   const tz = ctx.family.timezone;
-  const isSlot = form.get("kind") === "slot";
-  if (isSlot && !ctx.isParent) throw new FieldError("Only parents can add activity slots");
   const title = requiredStr(form, "title", "What");
   if (!place) throw new FieldError("Add where it is");
   const date = isoDate(form, "date");
@@ -97,39 +103,144 @@ export async function addEvent(ctx: FamilyContextValue, form: FormData, place: P
   const endTime = str(form, "end_time", 5);
   if ((startTime && !TIME_RE.test(startTime)) || (endTime && !TIME_RE.test(endTime))) throw new FieldError("Invalid time");
   const allDay = form.get("all_day") === "on" || !startTime;
-
   const startsAt = zonedLocalToUtcIso(allDay ? date : `${date}T${startTime}`, tz);
   const endsAt = !allDay && endTime ? zonedLocalToUtcIso(`${date}T${endTime}`, tz) : null;
   if (endsAt && endsAt < startsAt) throw new FieldError("End time must be after start time");
+  return {
+    title,
+    location: place.name === place.address ? place.address.slice(0, 200) : `${place.name} — ${place.address}`.slice(0, 200),
+    lat: place.lat,
+    lng: place.lng,
+    description: str(form, "description", 2000),
+    starts_at: startsAt,
+    ends_at: endsAt,
+    all_day: allDay,
+    assigned_to: assignee(form, ctx),
+  };
+}
+
+function driverField(ctx: FamilyContextValue, form: FormData) {
+  const driverId = uuid(form, "driver_id");
+  if (driverId && !ctx.members.some((m) => m.user_id === driverId)) throw new FieldError("That driver isn't in your family");
+  return driverId;
+}
+
+function inviteesField(ctx: FamilyContextValue, form: FormData, ownerId: string) {
+  const ids = form.getAll("invitees").map(String);
+  return [...new Set(ids)].filter((id) => id !== ownerId && ctx.members.some((m) => m.user_id === id));
+}
+
+/** Can I change this event? Mirrors family_planner.can_edit_event (the database decides). */
+export function canEditEvent(ctx: FamilyContextValue, e: CalendarEvent, invites: EventInvite[]) {
+  if (ctx.isParent) return true;
+  if (e.kind !== "event") return false;
+  if (e.created_by === ctx.userId) return true;
+  return e.invitees_can_edit && invites.some((i) => i.event_id === e.id && i.user_id === ctx.userId && i.status === "accepted");
+}
+
+export function canDeleteEvent(ctx: FamilyContextValue, e: CalendarEvent) {
+  return ctx.isParent || (e.kind === "event" && e.created_by === ctx.userId);
+}
+
+export async function addEvent(ctx: FamilyContextValue, form: FormData, place: Place | null) {
+  const tz = ctx.family.timezone;
+  const isSlot = form.get("kind") === "slot";
+  if (isSlot && !ctx.isParent) throw new FieldError("Only parents can add activity slots");
+  if (!ctx.isParent && ctx.me.event_permission === "blocked") throw new FieldError("A parent has turned off adding events for you");
+  const fields = eventFields(ctx, form, place);
   const closeDate = isoDate(form, "close_date");
   const closeTime = str(form, "close_time", 5);
   if (closeTime && !TIME_RE.test(closeTime)) throw new FieldError("Invalid time");
   const closesAt = isSlot && closeDate ? zonedLocalToUtcIso(closeTime ? `${closeDate}T${closeTime}` : `${closeDate}T23:59`, tz) : null;
 
-  const driverId = uuid(form, "driver_id");
-  if (driverId && !ctx.isParent) throw new FieldError("Only parents can assign drivers");
-  if (driverId && !ctx.members.some((m) => m.user_id === driverId)) throw new FieldError("That driver isn't in your family");
+  const { data, error } = await ctx.supabase
+    .from("events")
+    .insert({
+      family_id: ctx.family.id,
+      kind: isSlot ? "slot" : "event",
+      requests_close_at: closesAt,
+      ...fields,
+      assigned_to: isSlot ? null : fields.assigned_to,
+      driver_id: ctx.isParent ? driverField(ctx, form) : null,
+      invitees_can_edit: form.get("invitees_can_edit") !== "false",
+    })
+    .select("id")
+    .single();
+  check(error);
 
+  const invitees = isSlot ? [] : inviteesField(ctx, form, ctx.userId);
+  if (invitees.length) {
+    check(
+      (await ctx.supabase.from("event_invites").insert(invitees.map((user_id) => ({ event_id: data!.id, user_id, family_id: ctx.family.id }))))
+        .error,
+    );
+  }
+  announceChange();
+}
+
+export async function updateEvent(
+  ctx: FamilyContextValue,
+  event: CalendarEvent,
+  invites: EventInvite[],
+  form: FormData,
+  place: Place | null,
+) {
+  if (!canEditEvent(ctx, event, invites)) throw new FieldError("You can't change this event");
+  const fields = eventFields(ctx, form, place);
+  const patch: {
+    [K in keyof ReturnType<typeof eventFields>]?: ReturnType<typeof eventFields>[K];
+  } & { driver_id?: string | null; invitees_can_edit?: boolean } = { ...fields };
+  if (event.kind === "slot") patch.assigned_to = null;
+  if (ctx.isParent) patch.driver_id = driverField(ctx, form);
+  if (ctx.isParent || event.created_by === ctx.userId) patch.invitees_can_edit = form.get("invitees_can_edit") !== "false";
+  check((await ctx.supabase.from("events").update(patch).eq("id", event.id).eq("family_id", ctx.family.id)).error);
+
+  if (event.kind === "event") {
+    const wanted = inviteesField(ctx, form, event.created_by);
+    const current = invites.filter((i) => i.event_id === event.id).map((i) => i.user_id);
+    const add = wanted.filter((id) => !current.includes(id));
+    const remove = current.filter((id) => !wanted.includes(id));
+    if (add.length) {
+      check(
+        (await ctx.supabase.from("event_invites").insert(add.map((user_id) => ({ event_id: event.id, user_id, family_id: ctx.family.id }))))
+          .error,
+      );
+    }
+    if (remove.length) {
+      check((await ctx.supabase.from("event_invites").delete().eq("event_id", event.id).in("user_id", remove)).error);
+    }
+  }
+  announceChange();
+}
+
+/** Parents approve or decline an event a child (or other) asked to add. */
+export async function setEventStatus(ctx: FamilyContextValue, eventId: string, status: "approved" | "declined") {
+  if (!ctx.isParent) throw new FieldError("Only parents can approve events");
+  check((await ctx.supabase.from("events").update({ status }).eq("id", eventId).eq("family_id", ctx.family.id)).error);
+  announceChange();
+}
+
+/** Accept or decline an invite to someone's event. */
+export async function respondToInvite(ctx: FamilyContextValue, eventId: string, status: "accepted" | "declined") {
   check(
-    (
-      await ctx.supabase.from("events").insert({
-        family_id: ctx.family.id,
-        kind: isSlot ? "slot" : "event",
-        requests_close_at: closesAt,
-        title,
-        location: place.name === place.address ? place.address.slice(0, 200) : `${place.name} — ${place.address}`.slice(0, 200),
-        lat: place.lat,
-        lng: place.lng,
-        description: str(form, "description", 2000),
-        starts_at: startsAt,
-        ends_at: endsAt,
-        all_day: allDay,
-        assigned_to: isSlot ? null : assignee(form, ctx),
-        driver_id: driverId,
-      })
-    ).error,
+    (await ctx.supabase.from("event_invites").update({ status }).eq("event_id", eventId).eq("user_id", ctx.userId)).error,
   );
   announceChange();
+}
+
+/** Parents: can this person add events freely, with approval, or not at all? */
+export async function setEventPermission(ctx: FamilyContextValue, userId: string, permission: EventPermission) {
+  if (!ctx.isParent) throw new FieldError("Only parents can change this");
+  check(
+    (
+      await ctx.supabase
+        .from("family_members")
+        .update({ event_permission: permission })
+        .eq("family_id", ctx.family.id)
+        .eq("user_id", userId)
+    ).error,
+  );
+  await ctx.reloadFamily();
 }
 
 /** Parents: pick who drives to an event (null = no driver). */

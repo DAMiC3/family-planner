@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { AddEventSheet } from "@/components/add-event-sheet";
+import { EventSheet } from "@/components/add-event-sheet";
 import { useFamily } from "@/components/family-provider";
 import { OfflineBanner } from "@/components/pwa";
 import { useSession } from "@/components/session-provider";
@@ -181,7 +181,7 @@ export function AppChrome({ children }: { children: React.ReactNode }) {
         ))}
       </nav>
 
-      <AddEventSheet open={adding} onClose={() => setAdding(false)} />
+      <EventSheet open={adding} onClose={() => setAdding(false)} />
     </>
   );
 }

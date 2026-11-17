@@ -3,6 +3,8 @@
 // Update this file whenever you add a migration.
 
 export type MemberRole = "parent" | "child" | "other";
+export type EventPermission = "allowed" | "approval" | "blocked";
+export type EventStatus = "approved" | "pending" | "declined";
 export type RuleArea = "everything" | "events" | "tasks" | "shopping" | "meals" | "requests";
 export type MealType = "breakfast" | "lunch" | "dinner" | "snack";
 
@@ -29,6 +31,7 @@ export type FamilyMember = {
   display_name: string;
   role: MemberRole;
   color: string;
+  event_permission: EventPermission;
   joined_at: string;
 };
 
@@ -48,6 +51,8 @@ export type CalendarEvent = {
   lat: number | null;
   lng: number | null;
   driver_id: string | null;
+  status: EventStatus;
+  invitees_can_edit: boolean;
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -168,6 +173,16 @@ export type PushSubscriptionRow = {
   created_at: string;
 };
 
+export type EventInvite = {
+  event_id: string;
+  user_id: string;
+  family_id: string;
+  status: "pending" | "accepted" | "declined";
+  invited_by: string | null;
+  created_at: string;
+  responded_at: string | null;
+};
+
 export type SavedPlace = {
   id: string;
   user_id: string;
@@ -198,7 +213,7 @@ export type Database = {
       family_members: Table<
         FamilyMember,
         never,
-        Partial<Pick<FamilyMember, "display_name" | "color" | "role">>
+        Partial<Pick<FamilyMember, "display_name" | "color" | "role" | "event_permission">>
       >;
       events: Table<
         CalendarEvent,
@@ -217,6 +232,8 @@ export type Database = {
               | "lat"
               | "lng"
               | "driver_id"
+              | "status"
+              | "invitees_can_edit"
             >
           >
       >;
@@ -257,6 +274,7 @@ export type Database = {
         Pick<SavedPlace, "name" | "address" | "lat" | "lng"> & Partial<Pick<SavedPlace, "is_home">>
       >;
       change_log: Table<ChangeLogRow, never, never>;
+      event_invites: Table<EventInvite, Pick<EventInvite, "event_id" | "user_id" | "family_id">, Pick<EventInvite, "status">>;
       meals: Table<
         Meal,
         Pick<Meal, "family_id" | "date" | "title"> & Partial<Pick<Meal, "meal_type" | "notes">>
@@ -270,6 +288,8 @@ export type Database = {
       is_family_member: { Args: { p_family_id: string }; Returns: boolean };
       is_family_parent: { Args: { p_family_id: string }; Returns: boolean };
       can_write: { Args: { p_family_id: string; p_area: RuleArea }; Returns: boolean };
+      can_edit_event: { Args: { p_event_id: string }; Returns: boolean };
+      is_event_invitee: { Args: { p_event_id: string }; Returns: boolean };
       my_invites: { Args: Record<string, never>; Returns: MyInvite[] };
       accept_invite: { Args: { p_invite_id: string; p_display_name: string }; Returns: Family };
       save_push_subscription: {
