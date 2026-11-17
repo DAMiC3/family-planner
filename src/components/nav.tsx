@@ -7,12 +7,13 @@ import { AddEventSheet } from "@/components/add-event-sheet";
 import { useFamily } from "@/components/family-provider";
 import { OfflineBanner } from "@/components/pwa";
 import { useSession } from "@/components/session-provider";
+import { PinIcon } from "@/components/pin-icon";
 import { Avatar } from "@/components/ui";
 import { channelName, getSupabase } from "@/lib/supabase/client";
 
-export const TABS = [
+export const TABS: { href: string; label: string; short: string; icon: React.ReactNode }[] = [
   { href: "/program", label: "My program", short: "Program", icon: "📋" },
-  { href: "/map", label: "Map", short: "Map", icon: "📍" },
+  { href: "/map", label: "Map", short: "Map", icon: <PinIcon size={24} /> },
   { href: "/calendar", label: "Calendar", short: "Calendar", icon: "📅" },
   { href: "/tasks", label: "Tasks", short: "Tasks", icon: "✅" },
   { href: "/shopping", label: "Shopping", short: "Shop", icon: "🛒" },
@@ -172,7 +173,7 @@ export function AppChrome({ children }: { children: React.ReactNode }) {
             href={t.href}
             className={`flex flex-col items-center gap-0.5 pt-2 pb-1.5 text-[11px] font-medium ${active(t.href) ? "text-brand-600" : "text-muted"}`}
           >
-            <span className={`text-[22px] leading-none ${active(t.href) ? "" : "opacity-70 grayscale-[40%]"}`} aria-hidden>
+            <span className={`flex h-6 items-center text-[22px] leading-none ${active(t.href) ? "" : "opacity-70 grayscale-[40%]"}`} aria-hidden>
               {t.icon}
             </span>
             {t.short}
