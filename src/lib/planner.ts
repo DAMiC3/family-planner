@@ -106,7 +106,15 @@ function eventFields(ctx: FamilyContextValue, form: FormData, place: Place | nul
   const startsAt = zonedLocalToUtcIso(allDay ? date : `${date}T${startTime}`, tz);
   const endsAt = !allDay && endTime ? zonedLocalToUtcIso(`${date}T${endTime}`, tz) : null;
   if (endsAt && endsAt < startsAt) throw new FieldError("End time must be after start time");
+  const arriveTime = str(form, "arrive_time", 5);
+  const pickupTime = str(form, "pickup_time", 5);
+  if ((arriveTime && !TIME_RE.test(arriveTime)) || (pickupTime && !TIME_RE.test(pickupTime))) throw new FieldError("Invalid time");
+  const arriveBy = arriveTime ? zonedLocalToUtcIso(`${date}T${arriveTime}`, tz) : null;
+  const pickupAt = pickupTime ? zonedLocalToUtcIso(`${date}T${pickupTime}`, tz) : null;
+  if (arriveBy && pickupAt && pickupAt < arriveBy) throw new FieldError("Pick-up must be after the drop-off time");
   return {
+    arrive_by: arriveBy,
+    pickup_at: pickupAt,
     title,
     location: place.name === place.address ? place.address.slice(0, 200) : `${place.name} — ${place.address}`.slice(0, 200),
     lat: place.lat,
@@ -123,6 +131,12 @@ function driverField(ctx: FamilyContextValue, form: FormData) {
   const driverId = uuid(form, "driver_id");
   if (driverId && !ctx.members.some((m) => m.user_id === driverId)) throw new FieldError("That driver isn't in your family");
   return driverId;
+}
+
+function carField(ctx: FamilyContextValue, form: FormData) {
+  const carId = uuid(form, "car_id");
+  if (carId && !ctx.cars.some((c) => c.id === carId)) throw new FieldError("That car isn't in your family");
+  return carId;
 }
 
 function inviteesField(ctx: FamilyContextValue, form: FormData, ownerId: string) {
@@ -162,6 +176,7 @@ export async function addEvent(ctx: FamilyContextValue, form: FormData, place: P
       ...fields,
       assigned_to: isSlot ? null : fields.assigned_to,
       driver_id: ctx.isParent ? driverField(ctx, form) : null,
+      car_id: ctx.canAssignCars && !isSlot ? carField(ctx, form) : null,
       invitees_can_edit: form.get("invitees_can_edit") !== "false",
     })
     .select("id")
@@ -189,7 +204,8 @@ export async function updateEvent(
   const fields = eventFields(ctx, form, place);
   const patch: {
     [K in keyof ReturnType<typeof eventFields>]?: ReturnType<typeof eventFields>[K];
-  } & { driver_id?: string | null; invitees_can_edit?: boolean } = { ...fields };
+  } & { driver_id?: string | null; invitees_can_edit?: boolean; car_id?: string | null } = { ...fields };
+  if (ctx.canAssignCars && event.kind === "event") patch.car_id = carField(ctx, form);
   if (event.kind === "slot") patch.assigned_to = null;
   if (ctx.isParent) patch.driver_id = driverField(ctx, form);
   if (ctx.isParent || event.created_by === ctx.userId) patch.invitees_can_edit = form.get("invitees_can_edit") !== "false";
@@ -236,6 +252,75 @@ export async function setEventPermission(ctx: FamilyContextValue, userId: string
       await ctx.supabase
         .from("family_members")
         .update({ event_permission: permission })
+        .eq("family_id", ctx.family.id)
+        .eq("user_id", userId)
+    ).error,
+  );
+  await ctx.reloadFamily();
+}
+
+/** Choose the car for an event (parents, or someone a parent allowed). null = no car yet (pin floats). */
+export async function setCar(ctx: FamilyContextValue, eventId: string, carId: string | null) {
+  if (!ctx.canAssignCars) throw new FieldError("A parent has to give you permission to choose cars");
+  check((await ctx.supabase.from("events").update({ car_id: carId }).eq("id", eventId).eq("family_id", ctx.family.id)).error);
+  announceChange();
+}
+
+// ---------------------------------------------------------------- cars (parents)
+
+const CAR_COLOR_RE = /^#[0-9a-fA-F]{6}$/;
+
+export async function addCar(ctx: FamilyContextValue, form: FormData) {
+  if (!ctx.isParent) throw new FieldError("Only parents can add cars");
+  const name = requiredStr(form, "name", "Car name", 40);
+  const color = str(form, "color", 7) ?? "#FF385C";
+  if (!CAR_COLOR_RE.test(color)) throw new FieldError("Pick a colour");
+  check(
+    (
+      await ctx.supabase
+        .from("cars")
+        .insert({ family_id: ctx.family.id, name, color, is_default: ctx.cars.length === 0 })
+    ).error,
+  );
+  await ctx.reloadFamily();
+}
+
+export async function updateCar(ctx: FamilyContextValue, id: string, patch: { name?: string; color?: string }) {
+  if (!ctx.isParent) throw new FieldError("Only parents can change cars");
+  if (patch.name !== undefined && !patch.name.trim()) throw new FieldError("Car name is required");
+  if (patch.color !== undefined && !CAR_COLOR_RE.test(patch.color)) throw new FieldError("Pick a colour");
+  check((await ctx.supabase.from("cars").update(patch).eq("id", id).eq("family_id", ctx.family.id)).error);
+  await ctx.reloadFamily();
+}
+
+export async function makeDefaultCar(ctx: FamilyContextValue, id: string) {
+  if (!ctx.isParent) throw new FieldError("Only parents can change cars");
+  check((await ctx.supabase.from("cars").update({ is_default: false }).eq("family_id", ctx.family.id).eq("is_default", true)).error);
+  check((await ctx.supabase.from("cars").update({ is_default: true }).eq("id", id).eq("family_id", ctx.family.id)).error);
+  await ctx.reloadFamily();
+}
+
+export async function deleteCar(ctx: FamilyContextValue, id: string) {
+  if (!ctx.isParent) throw new FieldError("Only parents can remove cars");
+  check((await ctx.supabase.from("cars").delete().eq("id", id).eq("family_id", ctx.family.id)).error);
+  await ctx.reloadFamily();
+  announceChange();
+}
+
+export async function setAutoAssignHours(ctx: FamilyContextValue, hours: number) {
+  if (!ctx.isParent) throw new FieldError("Only parents can change this");
+  if (!Number.isInteger(hours) || hours < 0 || hours > 168) throw new FieldError("Choose between 0 and 168 hours");
+  check((await ctx.supabase.from("families").update({ car_auto_assign_hours: hours }).eq("id", ctx.family.id)).error);
+  await ctx.reloadFamily();
+}
+
+export async function setCanAssignCars(ctx: FamilyContextValue, userId: string, allowed: boolean) {
+  if (!ctx.isParent) throw new FieldError("Only parents can change this");
+  check(
+    (
+      await ctx.supabase
+        .from("family_members")
+        .update({ can_assign_cars: allowed })
         .eq("family_id", ctx.family.id)
         .eq("user_id", userId)
     ).error,

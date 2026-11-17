@@ -20,6 +20,7 @@ export type Family = {
   name: string;
   invite_code: string;
   timezone: string;
+  car_auto_assign_hours: number;
   created_by: string | null;
   created_at: string;
   updated_at: string;
@@ -32,6 +33,7 @@ export type FamilyMember = {
   role: MemberRole;
   color: string;
   event_permission: EventPermission;
+  can_assign_cars: boolean;
   joined_at: string;
 };
 
@@ -53,6 +55,9 @@ export type CalendarEvent = {
   driver_id: string | null;
   status: EventStatus;
   invitees_can_edit: boolean;
+  car_id: string | null;
+  arrive_by: string | null;
+  pickup_at: string | null;
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -68,6 +73,7 @@ export type Task = {
   assigned_to: string | null;
   completed_at: string | null;
   completed_by: string | null;
+  event_id: string | null;
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -173,6 +179,16 @@ export type PushSubscriptionRow = {
   created_at: string;
 };
 
+export type Car = {
+  id: string;
+  family_id: string;
+  name: string;
+  color: string;
+  is_default: boolean;
+  created_by: string | null;
+  created_at: string;
+};
+
 export type EventInvite = {
   event_id: string;
   user_id: string;
@@ -209,11 +225,11 @@ export type ChangeLogRow = {
 export type Database = {
   family_planner: {
     Tables: {
-      families: Table<Family, never, Pick<Family, "name" | "timezone">>;
+      families: Table<Family, never, Partial<Pick<Family, "name" | "timezone" | "car_auto_assign_hours">>>;
       family_members: Table<
         FamilyMember,
         never,
-        Partial<Pick<FamilyMember, "display_name" | "color" | "role" | "event_permission">>
+        Partial<Pick<FamilyMember, "display_name" | "color" | "role" | "event_permission" | "can_assign_cars">>
       >;
       events: Table<
         CalendarEvent,
@@ -234,6 +250,9 @@ export type Database = {
               | "driver_id"
               | "status"
               | "invitees_can_edit"
+              | "car_id"
+              | "arrive_by"
+              | "pickup_at"
             >
           >
       >;
@@ -274,6 +293,7 @@ export type Database = {
         Pick<SavedPlace, "name" | "address" | "lat" | "lng"> & Partial<Pick<SavedPlace, "is_home">>
       >;
       change_log: Table<ChangeLogRow, never, never>;
+      cars: Table<Car, Pick<Car, "family_id" | "name" | "color"> & Partial<Pick<Car, "is_default">>>;
       event_invites: Table<EventInvite, Pick<EventInvite, "event_id" | "user_id" | "family_id">, Pick<EventInvite, "status">>;
       meals: Table<
         Meal,

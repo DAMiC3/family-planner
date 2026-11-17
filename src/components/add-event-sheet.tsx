@@ -3,6 +3,7 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { Button } from "@/components/action-form";
 import { useFamily } from "@/components/family-provider";
+import { CarSelect } from "@/components/cars-sheet";
 import { LocationPicker } from "@/components/location-picker";
 import { Avatar, Field, Input, Select } from "@/components/ui";
 import { dateInZone, formatDay, formatTime, todayInZone } from "@/lib/dates";
@@ -17,6 +18,7 @@ import {
   setEventStatus,
   updateEvent,
 } from "@/lib/planner";
+import { googleMapsPlaceUrl } from "@/lib/route";
 import type { CalendarEvent, EventInvite } from "@/lib/supabase/types";
 
 /** Collapsible section for the less common options. */
@@ -222,16 +224,34 @@ export function EventSheet({ open, onClose, event, invites = [] }: Props) {
                     )}
                   </More>
                 )}
-                {ctx.isParent && (
-                  <More icon="🚗" title="Driver">
-                    <Select name="driver_id" defaultValue={event?.driver_id ?? ""}>
-                      <option value="">No driver yet</option>
-                      {ctx.members.map((m) => (
-                        <option key={m.user_id} value={m.user_id}>
-                          {m.display_name} ({m.role})
-                        </option>
-                      ))}
-                    </Select>
+                {!isSlot && (
+                  <More icon="🚗" title="Drop-off, pick-up & car">
+                    <div className="grid grid-cols-2 gap-3">
+                      <Field label="Be there by">
+                        <Input name="arrive_time" type="time" defaultValue={event?.arrive_by ? formatTime(event.arrive_by, tz) : undefined} />
+                      </Field>
+                      <Field label="Pick up at">
+                        <Input name="pickup_time" type="time" defaultValue={event?.pickup_at ? formatTime(event.pickup_at, tz) : undefined} />
+                      </Field>
+                    </div>
+                    <p className="-mt-1 text-xs text-muted">Empty “be there by” = the start time. Leave “pick up” empty if nobody needs collecting.</p>
+                    {ctx.canAssignCars && (
+                      <Field label="Car">
+                        <CarSelect name="car_id" value={event?.car_id} />
+                      </Field>
+                    )}
+                    {ctx.isParent && (
+                      <Field label="Driver">
+                        <Select name="driver_id" defaultValue={event?.driver_id ?? ""}>
+                          <option value="">No driver yet</option>
+                          {ctx.members.map((m) => (
+                            <option key={m.user_id} value={m.user_id}>
+                              {m.display_name} ({m.role})
+                            </option>
+                          ))}
+                        </Select>
+                      </Field>
+                    )}
                   </More>
                 )}
                 <More icon="⏰" title="End time / all day">
@@ -328,7 +348,18 @@ function EventSummary({ event, invites }: { event: CalendarEvent; invites: Event
       </p>
       {event.location && <p>📍 {shortAddress(event.location)}</p>}
       <p>👤 {name(event.assigned_to) ?? "Everyone"}</p>
-      {event.lat != null && <p>🚗 {name(event.driver_id) ?? "No driver yet"}</p>}
+      {event.arrive_by && <p>⏱️ Be there by {formatTime(event.arrive_by, tz)}</p>}
+      {event.pickup_at && <p>↩️ Pick up at {formatTime(event.pickup_at, tz)}</p>}
+      {event.lat != null && (
+        <p>
+          🚗 {ctx.cars.find((c) => c.id === event.car_id)?.name ?? "No car yet"} · {name(event.driver_id) ?? "no driver yet"}
+        </p>
+      )}
+      {event.lat != null && (
+        <a href={googleMapsPlaceUrl({ lat: event.lat, lng: event.lng! })} target="_blank" rel="noopener noreferrer" className="font-semibold underline">
+          Open in Google Maps
+        </a>
+      )}
       {invites.length > 0 && (
         <p>
           👥 {invites.map((i) => `${name(i.user_id) ?? "?"} (${i.status})`).join(", ")}

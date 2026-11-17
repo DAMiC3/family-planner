@@ -15,6 +15,7 @@ import {
   regenerateInviteCode,
   removeMember,
   revokeInvite,
+  setCanAssignCars,
   setEventPermission,
   setMemberRole,
   updateFamily,
@@ -108,6 +109,18 @@ export function FamilyView() {
                       </span>
                     )}
                   </div>
+                )}
+                {m.role !== "parent" && (
+                  <label className="flex w-full items-center gap-2 pl-9">
+                    <input
+                      type="checkbox"
+                      checked={m.can_assign_cars}
+                      disabled={!isParent}
+                      onChange={(e) => setCanAssignCars(ctx, m.user_id, e.target.checked).catch((err) => alert(errorMessage(err)))}
+                      className="h-5 w-5 accent-brand-600"
+                    />
+                    <span className="text-muted">Can choose cars for their own events</span>
+                  </label>
                 )}
                 {isParent && m.user_id !== me.user_id && (
                   <ActButton

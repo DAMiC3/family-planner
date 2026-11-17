@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { ActButton, ActionForm } from "@/components/action-form";
 import { useFamily, type FamilyContextValue } from "@/components/family-provider";
 import { Avatar, Card, Empty, Field, Input, PageHeader, RestrictedNotice, Select, Skeleton } from "@/components/ui";
@@ -121,7 +122,14 @@ function TaskList({ tasks, ctx, today, reload }: { tasks: Task[]; ctx: FamilyCon
             >
               {t.completed_at ? "✓" : ""}
             </ActButton>
-            <span className={`flex-1 ${t.completed_at ? "text-zinc-400 line-through" : ""}`}>{t.title}</span>
+            <span className={`flex-1 ${t.completed_at ? "text-zinc-400 line-through" : ""}`}>
+              {t.title}
+              {t.event_id && !t.completed_at && (
+                <Link href="/map" className="ml-2 text-sm font-semibold text-brand-600 underline">
+                  Open map
+                </Link>
+              )}
+            </span>
             {t.points > 0 && <span className="text-xs text-amber-600">★ {t.points}</span>}
             {t.due_date && (
               <span className={`text-xs ${overdue ? "font-semibold text-red-600" : "text-zinc-500"}`}>

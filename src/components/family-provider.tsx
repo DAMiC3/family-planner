@@ -6,7 +6,7 @@ import { useSession } from "@/components/session-provider";
 import { Skeleton } from "@/components/ui";
 import { blockingRule } from "@/lib/rules";
 import { channelName, getSupabase, type DB } from "@/lib/supabase/client";
-import type { Family, FamilyMember, MemberRule, RuleArea } from "@/lib/supabase/types";
+import type { Car, Family, FamilyMember, MemberRule, RuleArea } from "@/lib/supabase/types";
 
 export type FamilyContextValue = {
   supabase: DB;
@@ -16,13 +16,16 @@ export type FamilyContextValue = {
   me: FamilyMember;
   members: FamilyMember[];
   rules: MemberRule[];
+  cars: Car[];
   isParent: boolean;
+  /** Parents, or someone a parent allowed to choose cars. */
+  canAssignCars: boolean;
   /** The rule blocking me from changing `area` right now (UI hint; the database enforces it). */
   blockedBy: (area: RuleArea) => MemberRule | undefined;
   reloadFamily: () => Promise<void>;
 };
 
-type Loaded = Pick<FamilyContextValue, "supabase" | "userId" | "email" | "family" | "me" | "members" | "rules">;
+type Loaded = Pick<FamilyContextValue, "supabase" | "userId" | "email" | "family" | "me" | "members" | "rules" | "cars">;
 
 const FamilyContext = createContext<FamilyContextValue | null>(null);
 
@@ -47,12 +50,13 @@ export function FamilyProvider({ children }: { children: ReactNode }) {
     if (mErr) return setError(mErr.message);
     if (!membership) return router.replace("/onboarding");
 
-    const [fam, mem, rules] = await Promise.all([
+    const [fam, mem, rules, cars] = await Promise.all([
       supabase.from("families").select("*").eq("id", membership.family_id).single(),
       supabase.from("family_members").select("*").eq("family_id", membership.family_id).order("joined_at"),
       supabase.from("member_rules").select("*").eq("family_id", membership.family_id).order("created_at"),
+      supabase.from("cars").select("*").eq("family_id", membership.family_id).order("created_at"),
     ]);
-    const err = fam.error ?? mem.error ?? rules.error;
+    const err = fam.error ?? mem.error ?? rules.error ?? cars.error;
     if (err) return setError(err.message);
     setValue({
       supabase,
@@ -62,6 +66,7 @@ export function FamilyProvider({ children }: { children: ReactNode }) {
       me: membership,
       members: mem.data!,
       rules: rules.data!,
+      cars: cars.data!,
     });
   }, [session, router]);
 
@@ -84,6 +89,7 @@ export function FamilyProvider({ children }: { children: ReactNode }) {
       .channel(channelName(`family-meta-${familyId}`))
       .on("postgres_changes", { event: "*", schema: "family_planner", table: "member_rules", filter: `family_id=eq.${familyId}` }, () => void load())
       .on("postgres_changes", { event: "*", schema: "family_planner", table: "family_members", filter: `family_id=eq.${familyId}` }, () => void load())
+      .on("postgres_changes", { event: "*", schema: "family_planner", table: "cars", filter: `family_id=eq.${familyId}` }, () => void load())
       .subscribe();
     return () => {
       void supabase.removeChannel(channel);
@@ -108,6 +114,7 @@ export function FamilyProvider({ children }: { children: ReactNode }) {
   const ctx: FamilyContextValue = {
     ...value,
     isParent: value.me.role === "parent",
+    canAssignCars: value.me.role === "parent" || value.me.can_assign_cars,
     blockedBy: (area) => blockingRule(value.rules, value.me, area, value.family.timezone),
     reloadFamily: load,
   };

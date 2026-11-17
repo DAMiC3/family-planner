@@ -59,3 +59,17 @@ button {
 .leaflet-container {
   font-family: var(--font-sans);
 }
+
+/* Trips with no car yet bob gently on the map ("floating" pins) */
+@keyframes pin-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-7px);
+  }
+}
+.pin-float {
+  animation: pin-float 1.6s ease-in-out infinite;
+}
