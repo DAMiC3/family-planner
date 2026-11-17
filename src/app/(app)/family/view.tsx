@@ -13,16 +13,12 @@ import {
   inviteByEmail,
   leaveFamily,
   regenerateInviteCode,
-  removeMember,
   revokeInvite,
-  setCanAssignCars,
-  setEventPermission,
-  setMemberRole,
   updateFamily,
   updateMyProfile,
 } from "@/lib/planner";
 import { ROLES } from "@/lib/rules";
-import type { EventPermission, Invite, MemberRole } from "@/lib/supabase/types";
+import type { Invite } from "@/lib/supabase/types";
 
 export function FamilyView() {
   const ctx = useFamily();
@@ -63,87 +59,27 @@ export function FamilyView() {
       </div>
       <div className="grid gap-6 md:grid-cols-2">
         <Card title={`Members (${members.length})`}>
-          <ul className="space-y-4">
+          <ul className="space-y-3">
             {members.map((m) => (
-              <li key={m.user_id} className="flex flex-wrap items-center gap-3 text-sm">
+              <li key={m.user_id} className="flex items-center gap-3 text-[15px]">
                 <Avatar name={m.display_name} color={m.color} />
                 <span className="flex-1 font-medium">
                   {m.display_name}
-                  {m.user_id === me.user_id && <span className="ml-1 text-zinc-400">(you)</span>}
+                  {m.user_id === me.user_id && <span className="ml-1 text-muted">(you)</span>}
                 </span>
-                {isParent ? (
-                  <Select
-                    aria-label={`Role for ${m.display_name}`}
-                    value={m.role}
-                    className="w-auto! py-1.5 text-sm"
-                    onChange={(e) => setMemberRole(ctx, m.user_id, e.target.value as MemberRole).catch((err) => alert(errorMessage(err)))}
-                  >
-                    {ROLES.map((r) => (
-                      <option key={r.value} value={r.value}>
-                        {r.label}
-                      </option>
-                    ))}
-                  </Select>
-                ) : (
-                  <RoleBadge role={m.role} />
-                )}
-                {m.role !== "parent" && (
-                  <div className="flex w-full items-center gap-2 pl-9">
-                    <span className="text-muted">Events:</span>
-                    {isParent ? (
-                      <Select
-                        aria-label={`Event permission for ${m.display_name}`}
-                        value={m.event_permission}
-                        className="w-auto! py-1.5 text-sm"
-                        onChange={(e) =>
-                          setEventPermission(ctx, m.user_id, e.target.value as EventPermission).catch((err) => alert(errorMessage(err)))
-                        }
-                      >
-                        <option value="allowed">Can add events</option>
-                        <option value="approval">Needs a parent&apos;s approval</option>
-                        <option value="blocked">Can&apos;t add events</option>
-                      </Select>
-                    ) : (
-                      <span>
-                        {m.event_permission === "allowed" ? "can add" : m.event_permission === "approval" ? "needs approval" : "can't add"}
-                      </span>
-                    )}
-                  </div>
-                )}
-                {m.role !== "parent" && (
-                  <label className="flex w-full items-center gap-2 pl-9">
-                    <input
-                      type="checkbox"
-                      checked={m.can_assign_cars}
-                      disabled={!isParent}
-                      onChange={(e) => setCanAssignCars(ctx, m.user_id, e.target.checked).catch((err) => alert(errorMessage(err)))}
-                      className="h-5 w-5 accent-brand-600"
-                    />
-                    <span className="text-muted">Can choose cars for their own events</span>
-                  </label>
-                )}
-                {isParent && m.user_id !== me.user_id && (
-                  <ActButton
-                    run={async () => {
-                      if (confirm(`Remove ${m.display_name} from the family?`)) await removeMember(ctx, m.user_id);
-                    }}
-                    label={`Remove ${m.display_name}`}
-                    className="px-1 text-zinc-400 hover:text-red-600"
-                  >
-                    ✕
-                  </ActButton>
-                )}
+                <RoleBadge role={m.role} />
               </li>
             ))}
           </ul>
-          <p className="mt-4 text-xs text-zinc-500">
-            <strong>Parents</strong> can change any event and manage the family. <strong>Children</strong> and{" "}
-            <strong>others</strong> can only change their own events (or ones they were invited to share), and can be limited
-            with the event setting above and house rules.
-          </p>
-          <Link href="/rules" className="mt-3 inline-block text-sm font-medium text-brand-600">
-            {isParent ? "Manage house rules →" : "See house rules →"}
-          </Link>
+          {isParent ? (
+            <Link href="/manage" className="mt-4 inline-block text-sm font-semibold underline">
+              Manage children & permissions →
+            </Link>
+          ) : (
+            <Link href="/rules" className="mt-4 inline-block text-sm font-semibold underline">
+              See house rules →
+            </Link>
+          )}
         </Card>
 
         {isParent && (
@@ -209,15 +145,25 @@ export function FamilyView() {
         </Card>
 
         <Card title="Your profile">
-          <p className="mb-3 text-sm text-zinc-500">{email}</p>
-          <ActionForm onSubmit={(f) => updateMyProfile(ctx, f)} submitLabel="Save" resetOnSuccess={false} successMessage="Saved">
-            <Field label="Name">
-              <Input name="display_name" defaultValue={me.display_name} maxLength={50} required />
-            </Field>
-            <Field label="Colour">
-              <Input name="color" type="color" defaultValue={me.color} className="h-10 w-20 p-1" />
-            </Field>
-          </ActionForm>
+          <p className="mb-3 text-sm text-muted">{email}</p>
+          {!isParent && !ctx.rawMe.can_edit_profile ? (
+            <p className="text-[15px]">
+              🔒 A parent has locked your name, nickname and colour. You&apos;re{" "}
+              <strong>{ctx.rawMe.nickname || ctx.rawMe.display_name}</strong>.
+            </p>
+          ) : (
+            <ActionForm onSubmit={(f) => updateMyProfile(ctx, f)} submitLabel="Save" resetOnSuccess={false} successMessage="Saved">
+              <Field label="Name">
+                <Input name="display_name" defaultValue={ctx.rawMe.display_name} maxLength={50} required />
+              </Field>
+              <Field label="Nickname (shown instead of your name)">
+                <Input name="nickname" defaultValue={ctx.rawMe.nickname ?? ""} maxLength={40} placeholder="Optional" />
+              </Field>
+              <Field label="Colour">
+                <Input name="color" type="color" defaultValue={ctx.rawMe.color} className="h-10 w-20 p-1" />
+              </Field>
+            </ActionForm>
+          )}
         </Card>
 
         {isParent && (

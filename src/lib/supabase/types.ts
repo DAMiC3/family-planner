@@ -34,6 +34,9 @@ export type FamilyMember = {
   color: string;
   event_permission: EventPermission;
   can_assign_cars: boolean;
+  nickname: string | null;
+  can_edit_profile: boolean;
+  family_confirmed: boolean | null;
   joined_at: string;
 };
 
@@ -230,7 +233,19 @@ export type Database = {
       family_members: Table<
         FamilyMember,
         never,
-        Partial<Pick<FamilyMember, "display_name" | "color" | "role" | "event_permission" | "can_assign_cars">>
+        Partial<
+          Pick<
+            FamilyMember,
+            | "display_name"
+            | "color"
+            | "role"
+            | "event_permission"
+            | "can_assign_cars"
+            | "nickname"
+            | "can_edit_profile"
+            | "family_confirmed"
+          >
+        >
       >;
       events: Table<
         CalendarEvent,

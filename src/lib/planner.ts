@@ -13,6 +13,7 @@ import { estimateLeaveBy } from "@/lib/route";
 import type {
   CalendarEvent,
   EventInvite,
+  FamilyMember,
   EventPermission,
   MealType,
   MemberRole,
@@ -52,17 +53,50 @@ export async function joinFamily(form: FormData) {
 }
 
 export async function updateMyProfile(ctx: FamilyContextValue, form: FormData) {
+  if (!ctx.isParent && !ctx.rawMe.can_edit_profile) throw new FieldError("A parent has locked your name, nickname and colour");
   const displayName = requiredStr(form, "display_name", "Name", 50);
+  const nickname = str(form, "nickname", 40);
   const color = str(form, "color", 7) ?? "#6366f1";
   if (!COLOR_RE.test(color)) throw new FieldError("Pick a valid colour");
   check(
     (
       await ctx.supabase
         .from("family_members")
-        .update({ display_name: displayName, color })
+        .update({ display_name: displayName, nickname, color })
         .eq("family_id", ctx.family.id)
         .eq("user_id", ctx.userId)
     ).error,
+  );
+  await ctx.reloadFamily();
+}
+
+/** Parents: set someone's name / nickname. */
+export async function updateMemberProfile(ctx: FamilyContextValue, userId: string, form: FormData) {
+  if (!ctx.isParent) throw new FieldError("Only parents can do this");
+  const displayName = requiredStr(form, "display_name", "Name", 50);
+  const nickname = str(form, "nickname", 40);
+  check(
+    (
+      await ctx.supabase
+        .from("family_members")
+        .update({ display_name: displayName, nickname })
+        .eq("family_id", ctx.family.id)
+        .eq("user_id", userId)
+    ).error,
+  );
+  await ctx.reloadFamily();
+}
+
+type MemberSettings = Partial<
+  Pick<FamilyMember, "event_permission" | "can_assign_cars" | "can_edit_profile" | "role">
+>;
+
+/** Parents: change settings for one or more people at once (the "All children" panel). */
+export async function setMemberSettings(ctx: FamilyContextValue, userIds: string[], patch: MemberSettings) {
+  if (!ctx.isParent) throw new FieldError("Only parents can change this");
+  if (!userIds.length) return;
+  check(
+    (await ctx.supabase.from("family_members").update(patch).eq("family_id", ctx.family.id).in("user_id", userIds)).error,
   );
   await ctx.reloadFamily();
 }

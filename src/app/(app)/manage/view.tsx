@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ActButton, ActionForm } from "@/components/action-form";
 import { CarsSheet } from "@/components/cars-sheet";
+import { ALL_CHILDREN, ChildSheet } from "@/components/child-sheet";
 import { RewardsComingSoon } from "@/components/coming-soon";
 import { useFamily } from "@/components/family-provider";
 import { Avatar, Card, Empty, Field, Input, PageHeader, Select, Skeleton } from "@/components/ui";
@@ -19,6 +20,7 @@ export function ManageView() {
   const { family, members, isParent } = ctx;
   const router = useRouter();
   const [showCars, setShowCars] = useState(false);
+  const [child, setChild] = useState<string | null>(null);
   const today = todayInZone(family.timezone);
 
   useEffect(() => {
@@ -81,6 +83,34 @@ export function ManageView() {
                 </li>
               )}
             </ul>
+          )}
+        </Card>
+
+        <Card title="Children">
+          <ul className="divide-y divide-line/60">
+            <li>
+              <button type="button" onClick={() => setChild(ALL_CHILDREN)} className="flex w-full items-center gap-3 py-3 text-left">
+                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-ink text-xs font-bold text-white">∗</span>
+                <span className="flex-1 font-semibold">All children</span>
+                <span className="text-sm text-muted">{members.filter((m) => m.role === "child").length}</span>
+                <span className="text-muted">›</span>
+              </button>
+            </li>
+            {members
+              .filter((m) => m.role !== "parent")
+              .map((m) => (
+                <li key={m.user_id}>
+                  <button type="button" onClick={() => setChild(m.user_id)} className="flex w-full items-center gap-3 py-3 text-left">
+                    <Avatar name={m.display_name} color={m.color} />
+                    <span className="flex-1 font-medium">{m.display_name}</span>
+                    {m.role === "other" && <span className="text-xs text-muted">other</span>}
+                    <span className="text-muted">›</span>
+                  </button>
+                </li>
+              ))}
+          </ul>
+          {members.every((m) => m.role === "parent") && (
+            <p className="pt-2 text-sm text-muted">No children yet — invite them from Family, roles &amp; invites.</p>
           )}
         </Card>
 
@@ -194,6 +224,7 @@ export function ManageView() {
         </Card>
       </div>
       <CarsSheet open={showCars} onClose={() => setShowCars(false)} />
+      <ChildSheet target={child} onClose={() => setChild(null)} />
     </>
   );
 }

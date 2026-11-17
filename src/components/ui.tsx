@@ -88,3 +88,38 @@ export function RoleBadge({ role }: { role: string }) {
   };
   return <span className={`rounded-full px-2 py-0.5 text-xs font-medium capitalize ${styles[role] ?? styles.other}`}>{role}</span>;
 }
+
+/** iOS-style on/off switch. `mixed` shows a half state (used by "All children" when they differ). */
+export function Switch({
+  checked,
+  mixed,
+  onChange,
+  label,
+  disabled,
+}: {
+  checked: boolean;
+  mixed?: boolean;
+  onChange: (v: boolean) => void;
+  label: string;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={mixed ? "mixed" : checked}
+      aria-label={label}
+      disabled={disabled}
+      onClick={() => onChange(mixed ? true : !checked)}
+      className={`relative h-8 w-[52px] shrink-0 rounded-full transition disabled:opacity-50 ${
+        mixed ? "bg-zinc-400" : checked ? "bg-ink" : "bg-zinc-300"
+      }`}
+    >
+      <span
+        className={`absolute top-1 h-6 w-6 rounded-full bg-white shadow transition-all ${
+          mixed ? "left-[14px]" : checked ? "left-[24px]" : "left-1"
+        }`}
+      />
+    </button>
+  );
+}

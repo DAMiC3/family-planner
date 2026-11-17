@@ -28,7 +28,6 @@ import {
 import type { CalendarEvent, SavedPlace } from "@/lib/supabase/types";
 import { useFamilyQuery } from "@/lib/use-family-query";
 
-type Range = "today" | "tomorrow" | "week";
 type Mode = "trips" | "route";
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
@@ -40,7 +39,7 @@ export function MapView() {
   const tz = family.timezone;
   const today = todayInZone(tz);
   const [mode, setMode] = useState<Mode>("trips");
-  const [range, setRange] = useState<Range>("today");
+  const [day, setDay] = useState(today); // trips are shown one day at a time
   const [showCars, setShowCars] = useState(false);
   const [dropMode, setDropMode] = useState(false);
   const [newPlace, setNewPlace] = useState<Place | null>(null);
@@ -63,8 +62,8 @@ export function MapView() {
   const [planning, setPlanning] = useState(false);
   const [planError, setPlanError] = useState<string | null>(null);
 
-  const rangeFrom = range === "tomorrow" ? addDays(today, 1) : today;
-  const rangeTo = range === "today" ? addDays(today, 1) : range === "tomorrow" ? addDays(today, 2) : addDays(today, 7);
+  const rangeFrom = day;
+  const rangeTo = addDays(day, 1);
 
   const { data, error, reload } = useFamilyQuery(
     async (c) => {
@@ -247,6 +246,7 @@ export function MapView() {
     const fromD = new Date(zonedLocalToUtcIso(from, tz));
     const toD = new Date(zonedLocalToUtcIso(to, tz));
     if (toD <= fromD) return setPlanError("The end of the timeframe must be after the start.");
+    if (toD.getTime() - fromD.getTime() > 24 * 3600_000) return setPlanError("A route can cover at most one day (24 hours).");
     setPlanning(true);
     try {
       let q = ctx.supabase
@@ -292,17 +292,16 @@ export function MapView() {
           {dropMode ? "Tap the map… (cancel)" : "＋ Pin"}
         </button>
         {mode === "trips" && (
-          <div className="absolute top-3 left-1/2 z-[500] flex -translate-x-1/2 gap-1 rounded-full bg-white p-1 shadow-[0_6px_16px_rgba(0,0,0,0.15)]">
-            {(["today", "tomorrow", "week"] as Range[]).map((r) => (
-              <button
-                key={r}
-                type="button"
-                onClick={() => setRange(r)}
-                className={`whitespace-nowrap rounded-full px-4 py-1.5 text-sm font-semibold ${range === r ? "bg-ink text-white" : "text-ink"}`}
-              >
-                {r === "today" ? "Today" : r === "tomorrow" ? "Tomorrow" : "7 days"}
-              </button>
-            ))}
+          <div className="absolute top-3 left-1/2 z-[500] flex -translate-x-1/2 items-center gap-1 rounded-full bg-white p-1 shadow-[0_6px_16px_rgba(0,0,0,0.15)]">
+            <button type="button" onClick={() => setDay(addDays(day, -1))} className="h-9 w-9 rounded-full text-lg font-bold" aria-label="Previous day">
+              ‹
+            </button>
+            <button type="button" onClick={() => setDay(today)} className="whitespace-nowrap rounded-full bg-ink px-4 py-1.5 text-sm font-semibold text-white">
+              {day === today ? "Today" : day === addDays(today, 1) ? "Tomorrow" : formatDay(day)}
+            </button>
+            <button type="button" onClick={() => setDay(addDays(day, 1))} className="h-9 w-9 rounded-full text-lg font-bold" aria-label="Next day">
+              ›
+            </button>
           </div>
         )}
       </div>
@@ -361,7 +360,6 @@ export function MapView() {
                         <span className="min-w-0">
                           <span className="block truncate font-semibold">{e.title}</span>
                           <span className="block truncate text-sm text-muted">
-                            {range === "week" ? `${formatDay(dateInZone(new Date(e.starts_at), tz))} · ` : ""}
                             {formatTime(e.arrive_by ?? e.starts_at, tz)}
                             {e.pickup_at ? ` → pick up ${formatTime(e.pickup_at, tz)}` : ""} · {shortAddress(e.location ?? "")}
                           </span>
