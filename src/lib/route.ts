@@ -107,6 +107,28 @@ async function durationMatrix(points: LatLng[]): Promise<{ m: number[][]; estima
   return { m: points.map((a) => points.map((b) => estimateSeconds(a, b))), estimated: true };
 }
 
+/** Driving time in seconds from a to b (OSRM, or an estimate if it's unavailable). */
+export async function travelSeconds(a: LatLng, b: LatLng): Promise<number> {
+  try {
+    const data = await fetchJson(`${OSRM}/route/v1/driving/${coordStr([a, b])}?overview=false`, 6000);
+    const d = data?.routes?.[0]?.duration;
+    if (typeof d === "number") return d;
+  } catch {
+    /* estimate below */
+  }
+  return estimateSeconds(a, b);
+}
+
+/**
+ * When someone has to leave home to be at `place` by `arriveIso`
+ * (drive time + BUFFER_MIN early). null if we don't know where home is.
+ */
+export async function estimateLeaveBy(home: LatLng | null, place: LatLng, arriveIso: string): Promise<string | null> {
+  if (!home) return null;
+  const secs = await travelSeconds(home, place);
+  return new Date(new Date(arriveIso).getTime() - secs * 1000 - BUFFER_MIN * MIN).toISOString();
+}
+
 /** Road geometry for a sequence of points (falls back to straight lines). */
 export async function routeLine(points: LatLng[]): Promise<[number, number][]> {
   if (points.length < 2) return points.map((p) => [p.lat, p.lng]);

@@ -8,6 +8,8 @@ import { getSupabase } from "@/lib/supabase/client";
 import { FieldError, check, isoDate, requiredStr, str, uuid } from "@/lib/form";
 import { isValidTimeZone, zonedLocalToUtcIso } from "@/lib/dates";
 import type { Place } from "@/lib/geo";
+import { loadMyPlaces } from "@/lib/places";
+import { estimateLeaveBy } from "@/lib/route";
 import type {
   CalendarEvent,
   EventInvite,
@@ -133,6 +135,16 @@ function driverField(ctx: FamilyContextValue, form: FormData) {
   return driverId;
 }
 
+/** Leave time for the default-car deadline: be-there-by minus the drive from my Home. */
+async function leaveByFor(fields: { arrive_by: string | null; starts_at: string; lat: number; lng: number }) {
+  try {
+    const home = (await loadMyPlaces()).find((p) => p.is_home) ?? null;
+    return await estimateLeaveBy(home, { lat: fields.lat, lng: fields.lng }, fields.arrive_by ?? fields.starts_at);
+  } catch {
+    return null;
+  }
+}
+
 function carField(ctx: FamilyContextValue, form: FormData) {
   const carId = uuid(form, "car_id");
   if (carId && !ctx.cars.some((c) => c.id === carId)) throw new FieldError("That car isn't in your family");
@@ -167,6 +179,7 @@ export async function addEvent(ctx: FamilyContextValue, form: FormData, place: P
   if (closeTime && !TIME_RE.test(closeTime)) throw new FieldError("Invalid time");
   const closesAt = isSlot && closeDate ? zonedLocalToUtcIso(closeTime ? `${closeDate}T${closeTime}` : `${closeDate}T23:59`, tz) : null;
 
+  const leaveBy = isSlot ? null : await leaveByFor(fields);
   const { data, error } = await ctx.supabase
     .from("events")
     .insert({
@@ -174,6 +187,7 @@ export async function addEvent(ctx: FamilyContextValue, form: FormData, place: P
       kind: isSlot ? "slot" : "event",
       requests_close_at: closesAt,
       ...fields,
+      leave_by: leaveBy,
       assigned_to: isSlot ? null : fields.assigned_to,
       driver_id: ctx.isParent ? driverField(ctx, form) : null,
       car_id: ctx.canAssignCars && !isSlot ? carField(ctx, form) : null,
@@ -204,7 +218,8 @@ export async function updateEvent(
   const fields = eventFields(ctx, form, place);
   const patch: {
     [K in keyof ReturnType<typeof eventFields>]?: ReturnType<typeof eventFields>[K];
-  } & { driver_id?: string | null; invitees_can_edit?: boolean; car_id?: string | null } = { ...fields };
+  } & { driver_id?: string | null; invitees_can_edit?: boolean; car_id?: string | null; leave_by?: string | null } = { ...fields };
+  if (event.kind === "event") patch.leave_by = await leaveByFor(fields);
   if (ctx.canAssignCars && event.kind === "event") patch.car_id = carField(ctx, form);
   if (event.kind === "slot") patch.assigned_to = null;
   if (ctx.isParent) patch.driver_id = driverField(ctx, form);

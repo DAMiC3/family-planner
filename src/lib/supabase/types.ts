@@ -58,6 +58,7 @@ export type CalendarEvent = {
   car_id: string | null;
   arrive_by: string | null;
   pickup_at: string | null;
+  leave_by: string | null;
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -253,6 +254,7 @@ export type Database = {
               | "car_id"
               | "arrive_by"
               | "pickup_at"
+              | "leave_by"
             >
           >
       >;

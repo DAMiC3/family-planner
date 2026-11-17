@@ -32,9 +32,10 @@ type Mode = "trips" | "route";
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 const PIN_PATH = "M12 0C5.37 0 0 5.2 0 11.6 0 20.3 12 32 12 32s12-11.7 12-20.4C24 5.2 18.63 0 12 0Zm0 6.8a4.8 4.8 0 1 1 0 9.6 4.8 4.8 0 0 1 0-9.6Z";
 
-function pinHtml(color: string, opts: { float?: boolean; badge?: string; label?: string } = {}) {
+function pinHtml(color: string, opts: { float?: boolean; badge?: string; label?: string; outline?: string } = {}) {
+  const outline = opts.outline ?? "#fff";
   return `<div class="${opts.float ? "pin-float" : ""}" style="position:relative;width:30px;height:40px;filter:drop-shadow(0 2px 3px rgba(0,0,0,.35))">
-    <svg width="30" height="40" viewBox="0 0 24 32" aria-hidden="true"><circle cx="12" cy="11.6" r="5" fill="#fff"/><path fill-rule="evenodd" fill="${color}" stroke="#fff" stroke-width="1.2" d="${PIN_PATH}"/></svg>
+    <svg width="30" height="40" viewBox="0 0 24 32" aria-hidden="true"><circle cx="12" cy="11.6" r="5" fill="#fff"/><path fill-rule="evenodd" fill="${color}" stroke="${outline}" stroke-width="${opts.outline ? 1.6 : 1.2}" d="${PIN_PATH}"/></svg>
     ${opts.label ? `<div style="position:absolute;top:6px;left:0;right:0;text-align:center;font:700 11px sans-serif;color:${color}">${esc(opts.label)}</div>` : ""}
     ${opts.badge ? `<div style="position:absolute;top:-8px;right:-8px;font-size:14px">${opts.badge}</div>` : ""}
   </div>`;
@@ -182,7 +183,7 @@ export function MapView() {
           const driver = e.driver_id ? memberById.get(e.driver_id) : undefined;
           const html = car
             ? pinHtml(car.color, { badge: driver ? undefined : "❗" })
-            : pinHtml("#FF385C", { float: true, badge: "❔" });
+            : pinHtml("#FFFFFF", { float: true, outline: "#222222" }); // white = no car yet
           const times = [
             `${formatDay(dateInZone(new Date(e.starts_at), tz))} ${formatTime(e.arrive_by ?? e.starts_at, tz)} drop-off`,
             e.pickup_at ? `${formatTime(e.pickup_at, tz)} pick-up` : "",
@@ -292,16 +293,18 @@ export function MapView() {
 
         {mode === "trips" && (
           <>
-            {cars.length > 0 && (
-              <div className="mb-2 flex flex-wrap gap-3 text-sm">
-                {cars.map((c) => (
-                  <span key={c.id} className="flex items-center gap-1.5">
-                    <span className="h-3 w-6 rounded-full" style={{ backgroundColor: c.color }} />
-                    {c.name}
-                  </span>
-                ))}
-              </div>
-            )}
+            <div className="mb-2 flex flex-wrap gap-3 text-sm">
+              {cars.map((c) => (
+                <span key={c.id} className="flex items-center gap-1.5">
+                  <span className="h-3 w-6 rounded-full" style={{ backgroundColor: c.color }} />
+                  {c.name}
+                </span>
+              ))}
+              <span className="flex items-center gap-1.5">
+                <span className="h-3 w-6 rounded-full border border-ink bg-white" />
+                No car yet
+              </span>
+            </div>
             <h1 className="text-xl font-bold">
               {data ? `${data.length} ${data.length === 1 ? "trip" : "trips"}` : "Trips"}
               {noCar > 0 && <span className="ml-2 text-base font-semibold text-brand-600">· {noCar} without a car</span>}

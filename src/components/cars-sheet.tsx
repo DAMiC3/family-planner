@@ -106,11 +106,12 @@ export function CarsSheet({ open, onClose }: { open: boolean; onClose: () => voi
 
               <h3 className="mt-6 mb-2 font-semibold">Default car</h3>
               <p className="mb-2 text-sm text-muted">
-                If a trip still has no car this many hours before it starts, the default car is assigned automatically.
+                If a trip still has no car this many hours before someone has to leave for it, the default car is assigned
+                automatically. (Leave time = be-there-by minus the drive from home.)
               </p>
               <div className="flex items-center gap-2">
                 <Input type="number" min={0} max={168} value={hours} onChange={(e) => setHours(e.target.value)} className="w-24!" aria-label="Hours before" />
-                <span className="text-[15px]">hours before</span>
+                <span className="text-[15px]">hours before leaving</span>
                 <Button variant="ghost" onClick={() => setAutoAssignHours(ctx, Number(hours)).catch((e) => alert(errorMessage(e)))}>
                   Save
                 </Button>
