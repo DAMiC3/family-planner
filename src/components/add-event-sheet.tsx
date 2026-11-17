@@ -57,10 +57,12 @@ type Props = {
   /** Present when editing / viewing an existing event. */
   event?: CalendarEvent | null;
   invites?: EventInvite[];
+  /** Start a new event at this spot (e.g. a pin dropped on the map). */
+  initialPlace?: Place | null;
 };
 
 /** Bottom sheet: add an event (from the + button) or open one to edit, approve, or answer an invite. */
-export function EventSheet({ open, onClose, event, invites = [] }: Props) {
+export function EventSheet({ open, onClose, event, invites = [], initialPlace = null }: Props) {
   const ctx = useFamily();
   const tz = ctx.family.timezone;
   const today = todayInZone(tz);
@@ -77,7 +79,7 @@ export function EventSheet({ open, onClose, event, invites = [] }: Props) {
   useEffect(() => {
     if (!open) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- reset the form each time the sheet opens
-    setPlace(event ? placeOf(event) : null);
+    setPlace(event ? placeOf(event) : initialPlace);
     setIsSlot(event?.kind === "slot");
     setError(null);
     const prev = document.body.style.overflow;
@@ -85,7 +87,7 @@ export function EventSheet({ open, onClose, event, invites = [] }: Props) {
     return () => {
       document.body.style.overflow = prev;
     };
-  }, [open, event]);
+  }, [open, event, initialPlace]);
 
   if (!open) return null;
 

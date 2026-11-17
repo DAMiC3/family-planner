@@ -28,3 +28,19 @@ export async function searchAddress(query: string): Promise<Place[]> {
 export function shortAddress(address: string) {
   return address.split(",").slice(0, 3).join(",").trim();
 }
+
+/** Address for a spot on the map (one lookup per pin drop, per Nominatim's rules). */
+export async function reverseGeocode(lat: number, lng: number): Promise<Place> {
+  const fallback = { name: "Dropped pin", address: `${lat.toFixed(5)}, ${lng.toFixed(5)}`, lat, lng };
+  try {
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=18&accept-language=en&lat=${lat}&lon=${lng}`,
+    );
+    if (!res.ok) return fallback;
+    const r = (await res.json()) as { display_name?: string; name?: string };
+    if (!r.display_name) return fallback;
+    return { name: r.name || r.display_name.split(",")[0], address: r.display_name, lat, lng };
+  } catch {
+    return fallback;
+  }
+}

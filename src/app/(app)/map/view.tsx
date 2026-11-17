@@ -4,15 +4,17 @@ import "leaflet/dist/leaflet.css";
 import type { LayerGroup, Map as LeafletMap } from "leaflet";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/action-form";
+import { EventSheet } from "@/components/add-event-sheet";
 import { CarSelect, CarsSheet } from "@/components/cars-sheet";
 import { DriverSelect } from "@/components/driver-select";
 import { useFamily } from "@/components/family-provider";
 import { Avatar, Empty } from "@/components/ui";
 import { addDays, dateInZone, formatDay, formatTime, todayInZone, zonedLocalToUtcIso } from "@/lib/dates";
 import { check, errorMessage } from "@/lib/form";
-import { shortAddress } from "@/lib/geo";
+import { reverseGeocode, shortAddress, type Place } from "@/lib/geo";
+import { pinHtml } from "@/lib/pin";
 import { loadMyPlaces } from "@/lib/places";
-import { setCar } from "@/lib/planner";
+import { moveEventPin, setCar } from "@/lib/planner";
 import {
   eventsInTimeframe,
   googleMapsDriveUrl,
@@ -30,13 +32,6 @@ type Range = "today" | "tomorrow" | "week";
 type Mode = "trips" | "route";
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
-const PIN_PATH = "M12 0C5.37 0 0 5.2 0 11.6 0 20.3 12 32 12 32s12-11.7 12-20.4C24 5.2 18.63 0 12 0Zm0 6.8a4.8 4.8 0 1 1 0 9.6 4.8 4.8 0 0 1 0-9.6Z";
-
-/** Every map pin is the Map-tab pin shape: the car's colour, or white when no car is chosen. */
-function pinHtml(color: string) {
-  return `<div style="width:30px;height:40px;filter:drop-shadow(0 1px 2px rgba(0,0,0,.45))"><svg width="30" height="40" viewBox="0 0 24 32" aria-hidden="true"><path fill-rule="evenodd" fill="${color}" d="${PIN_PATH}"/></svg></div>`;
-}
-
 const toLocalInput = (iso: string, tz: string) => `${dateInZone(new Date(iso), tz)}T${formatTime(iso, tz)}`;
 
 export function MapView() {
@@ -47,6 +42,12 @@ export function MapView() {
   const [mode, setMode] = useState<Mode>("trips");
   const [range, setRange] = useState<Range>("today");
   const [showCars, setShowCars] = useState(false);
+  const [dropMode, setDropMode] = useState(false);
+  const [newPlace, setNewPlace] = useState<Place | null>(null);
+  const dropModeRef = useRef(false);
+  useEffect(() => {
+    dropModeRef.current = dropMode;
+  }, [dropMode]);
   const [home, setHome] = useState<SavedPlace | null>(null);
   const mapEl = useRef<HTMLDivElement>(null);
   const map = useRef<LeafletMap | null>(null);
@@ -120,6 +121,12 @@ export function MapView() {
       const m = L.map(mapEl.current, { zoomControl: false }).setView([-26.2, 28.04], 11);
       L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap" }).addTo(m);
       layer.current = L.layerGroup().addTo(m);
+      // "+ Pin": tap the map to start a new event there.
+      m.on("click", async (e) => {
+        if (!dropModeRef.current) return;
+        setDropMode(false);
+        setNewPlace(await reverseGeocode(e.latlng.lat, e.latlng.lng));
+      });
       map.current = m;
       setReady(true);
     });
@@ -182,8 +189,29 @@ export function MapView() {
             `${formatDay(dateInZone(new Date(e.starts_at), tz))} ${formatTime(e.arrive_by ?? e.starts_at, tz)} drop-off`,
             e.pickup_at ? `${formatTime(e.pickup_at, tz)} pick-up` : "",
           ].filter(Boolean);
+          const canMove = isParent || e.created_by === userId;
+          const marker = L.marker([e.lat, e.lng], {
+            draggable: canMove,
+            icon: L.divIcon({ className: "", html, iconSize: [30, 40], iconAnchor: [15, 40], popupAnchor: [0, -36] }),
+          });
+          if (canMove) {
+            const ev = e;
+            marker.on("dragend", async () => {
+              const p = marker.getLatLng();
+              if (!confirm(`Move the pin for "${ev.title}" here?`)) {
+                marker.setLatLng([ev.lat!, ev.lng!]);
+                return;
+              }
+              try {
+                await moveEventPin(ctx, ev, p.lat, p.lng);
+              } catch (err) {
+                alert(errorMessage(err));
+                marker.setLatLng([ev.lat!, ev.lng!]);
+              }
+            });
+          }
           markers.push(
-            L.marker([e.lat, e.lng], { icon: L.divIcon({ className: "", html, iconSize: [30, 40], iconAnchor: [15, 40], popupAnchor: [0, -36] }) }).bindPopup(
+            marker.bindPopup(
               `<b>${esc(e.title)}</b><br>${times.map(esc).join(" · ")}<br>${esc(who ? who.display_name : "Everyone")}<br>` +
                 `${car ? `🚗 ${esc(car.name)}` : "<span style='color:#FF385C;font-weight:600'>No car yet</span>"} · ${driver ? esc(driver.display_name) : "no driver"}<br>` +
                 `<a href="${googleMapsPlaceUrl({ lat: e.lat, lng: e.lng })}" target="_blank" rel="noopener">Open in Google Maps</a>`,
@@ -208,6 +236,7 @@ export function MapView() {
     return () => {
       stale = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- ctx/userId/isParent are stable for the page
   }, [ready, mode, data, plan, home, members, cars, routeCar, tz]);
 
   async function runPlan() {
@@ -252,7 +281,16 @@ export function MapView() {
     <div className="-mx-4 -mt-5">
       {/* isolate: keeps Leaflet's own z-indexes from showing through sheets and menus */}
       <div className="relative isolate z-0">
-        <div ref={mapEl} className="h-[48dvh] w-full bg-zinc-100" />
+        <div ref={mapEl} className={`h-[48dvh] w-full bg-zinc-100 ${dropMode ? "cursor-crosshair" : ""}`} />
+        <button
+          type="button"
+          onClick={() => setDropMode((d) => !d)}
+          className={`absolute right-3 bottom-8 z-[500] rounded-full px-4 py-2.5 text-sm font-bold shadow-[0_6px_16px_rgba(0,0,0,0.2)] ${
+            dropMode ? "bg-ink text-white" : "bg-white text-ink"
+          }`}
+        >
+          {dropMode ? "Tap the map… (cancel)" : "＋ Pin"}
+        </button>
         {mode === "trips" && (
           <div className="absolute top-3 left-1/2 z-[500] flex -translate-x-1/2 gap-1 rounded-full bg-white p-1 shadow-[0_6px_16px_rgba(0,0,0,0.15)]">
             {(["today", "tomorrow", "week"] as Range[]).map((r) => (
@@ -303,6 +341,7 @@ export function MapView() {
               {data ? `${data.length} ${data.length === 1 ? "trip" : "trips"}` : "Trips"}
               {noCar > 0 && <span className="ml-2 text-base font-semibold text-brand-600">· {noCar} without a car</span>}
             </h1>
+            <p className="text-sm text-muted">Drag a pin to shift it · ＋ Pin to add one by tapping the map</p>
             {error && <p role="alert" className="mt-2 text-sm text-red-600">{error}</p>}
             {data && data.length === 0 && <Empty>No trips with a place. Tap + to add one.</Empty>}
             <ul className="mt-2 divide-y divide-line/60">
@@ -471,6 +510,7 @@ export function MapView() {
           ))}
       </div>
       <CarsSheet open={showCars} onClose={() => setShowCars(false)} />
+      <EventSheet open={newPlace !== null} initialPlace={newPlace} onClose={() => setNewPlace(null)} />
     </div>
   );
 }

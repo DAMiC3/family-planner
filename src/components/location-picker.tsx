@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { errorMessage } from "@/lib/form";
-import { searchAddress, shortAddress, type Place } from "@/lib/geo";
+import { reverseGeocode, searchAddress, shortAddress, type Place } from "@/lib/geo";
+import { PinMap } from "@/components/pin-map";
 import { loadMyPlaces, savePlace } from "@/lib/places";
 import type { SavedPlace } from "@/lib/supabase/types";
 
@@ -27,6 +28,7 @@ export function LocationPicker({
   const [saveAs, setSaveAs] = useState<"none" | "home" | "place">("none");
   const [saveName, setSaveName] = useState("");
   const [saved, setSaved] = useState(false);
+  const [dropping, setDropping] = useState(false);
 
   const reload = useCallback(() => loadMyPlaces().then(setPlaces).catch(() => {}), []);
   useEffect(() => {
@@ -127,6 +129,31 @@ export function LocationPicker({
             {busy ? "…" : "Search"}
           </button>
         </div>
+      )}
+
+      {value ? (
+        <>
+          <PinMap value={value} onPick={(p) => onChange({ ...value, lat: p.lat, lng: p.lng })} />
+          <p className="-mt-1 text-xs text-muted">Drag the pin (or tap the map) to shift it to the exact spot.</p>
+        </>
+      ) : dropping ? (
+        <>
+          <PinMap
+            value={null}
+            center={home ? { lat: home.lat, lng: home.lng } : null}
+            onPick={async (p) => {
+              setDropping(false);
+              setSaveAs("none");
+              setSaved(false);
+              onChange(await reverseGeocode(p.lat, p.lng));
+            }}
+          />
+          <p className="-mt-1 text-xs text-muted">Tap the map where the pin should go.</p>
+        </>
+      ) : (
+        <button type="button" onClick={() => setDropping(true)} className="self-start text-sm font-semibold underline underline-offset-2">
+          📍 Or drop a pin on the map
+        </button>
       )}
 
       {!value && results && results.length > 0 && (

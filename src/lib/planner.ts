@@ -274,6 +274,15 @@ export async function setEventPermission(ctx: FamilyContextValue, userId: string
   await ctx.reloadFamily();
 }
 
+/** Shift an event's pin on the map (owners, co-owners and parents). */
+export async function moveEventPin(ctx: FamilyContextValue, event: CalendarEvent, lat: number, lng: number) {
+  const leave_by = await leaveByFor({ arrive_by: event.arrive_by, starts_at: event.starts_at, lat, lng });
+  check(
+    (await ctx.supabase.from("events").update({ lat, lng, leave_by }).eq("id", event.id).eq("family_id", ctx.family.id)).error,
+  );
+  announceChange();
+}
+
 /** Choose the car for an event (parents, or someone a parent allowed). null = no car yet (pin floats). */
 export async function setCar(ctx: FamilyContextValue, eventId: string, carId: string | null) {
   if (!ctx.canAssignCars) throw new FieldError("A parent has to give you permission to choose cars");
