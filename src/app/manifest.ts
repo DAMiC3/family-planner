@@ -13,8 +13,8 @@ export default function manifest(): MetadataRoute.Manifest {
     scope: `${BASE_PATH}/`,
     display: "standalone",
     orientation: "portrait",
-    background_color: "#fafafa",
-    theme_color: "#4f46e5",
+    background_color: "#ffffff",
+    theme_color: "#ffffff",
     categories: ["lifestyle", "productivity"],
     icons: [
       { src: `${BASE_PATH}/icons/icon-192.png`, sizes: "192x192", type: "image/png", purpose: "any" },
@@ -23,9 +23,9 @@ export default function manifest(): MetadataRoute.Manifest {
     ],
     shortcuts: [
       { name: "My program", url: `${BASE_PATH}/program/` },
+      { name: "Map", url: `${BASE_PATH}/map/` },
+      { name: "Calendar", url: `${BASE_PATH}/calendar/` },
       { name: "Shopping list", url: `${BASE_PATH}/shopping/` },
-      { name: "Tasks", url: `${BASE_PATH}/tasks/` },
-      { name: "Inbox", url: `${BASE_PATH}/inbox/` },
     ],
   };
 }

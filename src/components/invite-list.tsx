@@ -29,7 +29,7 @@ export function InviteList({ onAccepted }: { onAccepted: () => void | Promise<vo
   return (
     <div className="space-y-3">
       {invites.map((inv) => (
-        <div key={inv.id} className="rounded-xl border border-indigo-200 bg-indigo-50 p-4 text-sm dark:border-indigo-900 dark:bg-indigo-950/40">
+        <div key={inv.id} className="rounded-xl border border-brand-200 bg-brand-50 p-4 text-sm">
           <p className="font-medium">
             ✉️ {inv.invited_by_name ?? "Someone"} invited you to join <strong>{inv.family_name}</strong> as <RoleBadge role={inv.role} />
           </p>

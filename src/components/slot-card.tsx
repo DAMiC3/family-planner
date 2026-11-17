@@ -33,7 +33,7 @@ export function SlotCard({
   );
 
   return (
-    <div className="rounded-xl border border-violet-200 bg-violet-50/60 p-3 dark:border-violet-900 dark:bg-violet-950/30">
+    <div className="rounded-xl border border-violet-200 bg-violet-50/60 p-3">
       <div className="flex items-start gap-2">
         <span aria-hidden>✨</span>
         <div className="flex-1">
@@ -63,7 +63,7 @@ export function SlotCard({
       </div>
 
       {chosen && (
-        <p className="mt-2 rounded-lg bg-emerald-100 px-3 py-2 text-sm font-medium text-emerald-900 dark:bg-emerald-950 dark:text-emerald-200">
+        <p className="mt-2 rounded-lg bg-emerald-100 px-3 py-2 text-sm font-medium text-emerald-900">
           ✅ Plan: {chosen.title}
         </p>
       )}
@@ -75,13 +75,13 @@ export function SlotCard({
           const mine = votes.some((v) => v.request_id === r.id && v.user_id === ctx.userId);
           const isChosen = r.id === slot.chosen_request_id;
           return (
-            <li key={r.id} className={`flex items-center gap-2 rounded-lg bg-white px-2 py-1.5 text-sm dark:bg-zinc-900 ${isChosen ? "ring-2 ring-emerald-500" : ""}`}>
+            <li key={r.id} className={`flex items-center gap-2 rounded-lg bg-white px-2 py-1.5 text-sm ${isChosen ? "ring-2 ring-emerald-500" : ""}`}>
               {who && <Avatar name={who.display_name} color={who.color} />}
               <span className="flex-1">{r.title}</span>
               <ActButton
                 run={async () => { await toggleVote(ctx, r.id, mine); await reload(); }}
                 label={mine ? "Remove my vote" : "Vote for this"}
-                className={`rounded-full px-2 py-0.5 text-xs ${mine ? "bg-indigo-600 text-white" : "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300"}`}
+                className={`rounded-full px-2 py-0.5 text-xs ${mine ? "bg-brand-600 text-white" : "bg-zinc-100 text-zinc-600"}`}
               >
                 👍 {count}
               </ActButton>

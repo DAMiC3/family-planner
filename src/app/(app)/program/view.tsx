@@ -8,6 +8,7 @@ import { SlotCard } from "@/components/slot-card";
 import { Card, Empty, PageHeader, RoleBadge, Skeleton } from "@/components/ui";
 import { addDays, dateInZone, formatDay, formatTime, todayInZone, zonedLocalToUtcIso } from "@/lib/dates";
 import { check } from "@/lib/form";
+import { shortAddress } from "@/lib/geo";
 import { toggleTask } from "@/lib/planner";
 import { describeRule, ruleAppliesTo } from "@/lib/rules";
 import { loadSlotExtras } from "@/lib/slot-data";
@@ -28,7 +29,7 @@ export function ProgramView() {
           .from("events")
           .select("*")
           .eq("family_id", family.id)
-          .or(`assigned_to.is.null,assigned_to.eq.${userId}`)
+          .or(`assigned_to.is.null,assigned_to.eq.${userId},driver_id.eq.${userId}`)
           .gte("starts_at", zonedLocalToUtcIso(today, tz))
           .lt("starts_at", zonedLocalToUtcIso(addDays(today, 7), tz))
           .order("starts_at"),
@@ -59,7 +60,7 @@ export function ProgramView() {
       <div className="mb-6 space-y-3">
         <InstallPrompt />
         {myRules.length > 0 && (
-          <div className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
+          <div className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
             <p className="font-medium">🔒 House rules for you</p>
             <ul className="mt-1 list-disc pl-5">
               {myRules.map((r) => {
@@ -81,7 +82,7 @@ export function ProgramView() {
       ) : (
         <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
           <Card>
-            <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
+            <div className="divide-y divide-zinc-100">
               {days.map((day) => {
                 const events = data.events.filter((e) => dateInZone(new Date(e.starts_at), tz) === day);
                 const meals = data.meals.filter((m) => m.date === day);
@@ -89,7 +90,7 @@ export function ProgramView() {
                 const empty = !events.length && !meals.length && !due.length;
                 return (
                   <section key={day} className="py-3">
-                    <h3 className={`mb-2 text-sm font-semibold ${day === today ? "text-indigo-600" : "text-zinc-500"}`}>
+                    <h3 className={`mb-2 text-sm font-semibold ${day === today ? "text-brand-600" : "text-zinc-500"}`}>
                       {day === today ? "Today" : day === addDays(today, 1) ? "Tomorrow" : formatDay(day, { weekday: "long" })}
                     </h3>
                     {empty && <p className="text-sm text-zinc-400">Free day 🎈</p>}
@@ -102,10 +103,13 @@ export function ProgramView() {
                         ) : (
                           <li key={e.id} className="flex gap-3">
                             <span className="w-16 shrink-0 tabular-nums text-zinc-500">{e.all_day ? "All day" : formatTime(e.starts_at, tz)}</span>
-                            <span className="flex-1">
+                            <span className="min-w-0 flex-1">
                               {e.title}
-                              {e.assigned_to === null && <span className="ml-1 text-xs text-zinc-400">(everyone)</span>}
-                              {e.location && <span className="block text-zinc-500">📍 {e.location}</span>}
+                              {e.assigned_to === null && <span className="ml-1 text-xs text-muted">(everyone)</span>}
+                              {e.driver_id === userId && (
+                                <span className="ml-2 rounded-full bg-brand-600 px-2 py-0.5 text-[11px] font-bold text-white">🚗 YOU DRIVE</span>
+                              )}
+                              {e.location && <span className="block truncate text-muted">📍 {shortAddress(e.location)}</span>}
                             </span>
                           </li>
                         ),
@@ -130,7 +134,7 @@ export function ProgramView() {
           </Card>
 
           <div className="space-y-6">
-            <Card title="My tasks" action={<Link href="/tasks" className="text-sm text-indigo-600">All →</Link>}>
+            <Card title="My tasks" action={<Link href="/tasks" className="text-sm text-brand-600">All →</Link>}>
               {myTasks.length === 0 && openTasks.length === 0 ? (
                 <Empty>Nothing to do 🎉</Empty>
               ) : (
@@ -140,7 +144,7 @@ export function ProgramView() {
                       <ActButton
                         run={async () => { await toggleTask(ctx, t.id, false); await reload(); }}
                         label="Mark done"
-                        className="h-6 w-6 shrink-0 rounded border border-zinc-400 hover:border-indigo-500"
+                        className="h-6 w-6 shrink-0 rounded border border-zinc-400 hover:border-brand-500"
                       >
                         {""}
                       </ActButton>

@@ -103,7 +103,7 @@ export function FamilyView() {
             <strong>Parents</strong> manage the family, rules and activity slots. <strong>Children</strong> and{" "}
             <strong>others</strong> can be limited with house rules.
           </p>
-          <Link href="/rules" className="mt-3 inline-block text-sm font-medium text-indigo-600">
+          <Link href="/rules" className="mt-3 inline-block text-sm font-medium text-brand-600">
             {isParent ? "Manage house rules →" : "See house rules →"}
           </Link>
         </Card>
@@ -132,7 +132,7 @@ export function FamilyView() {
               </Field>
             </ActionForm>
             {invites.length > 0 && (
-              <ul className="mt-4 space-y-2 border-t border-zinc-100 pt-3 text-sm dark:border-zinc-800">
+              <ul className="mt-4 space-y-2 border-t border-zinc-100 pt-3 text-sm">
                 {invites.map((inv) => (
                   <li key={inv.id} className="flex items-center gap-2">
                     <span className="flex-1 truncate">{inv.email}</span>
@@ -155,7 +155,7 @@ export function FamilyView() {
 
         <Card title="Family code">
           <p className="mb-3 text-sm text-zinc-500">Anyone with this code can join as “Other”. A parent can change their role after.</p>
-          <p className="mb-4 select-all rounded-lg bg-zinc-100 py-3 text-center font-mono text-2xl font-bold tracking-[0.3em] dark:bg-zinc-800">
+          <p className="mb-4 select-all rounded-lg bg-zinc-100 py-3 text-center font-mono text-2xl font-bold tracking-[0.3em]">
             {family.invite_code}
           </p>
           <div className="flex flex-wrap gap-2">

@@ -43,11 +43,11 @@ export function ActionForm({ onSubmit, children, submitLabel, className, resetOn
           {pending ? "Saving…" : submitLabel}
         </Button>
         {error && (
-          <p role="alert" className="text-sm text-red-600 dark:text-red-400">
+          <p role="alert" className="text-sm text-red-600">
             {error}
           </p>
         )}
-        {saved && successMessage && <p className="text-sm text-emerald-600 dark:text-emerald-400">{successMessage}</p>}
+        {saved && successMessage && <p className="text-sm text-emerald-600">{successMessage}</p>}
       </div>
     </form>
   );
@@ -59,15 +59,15 @@ export function Button({
   ...props
 }: React.ComponentProps<"button"> & { variant?: "primary" | "ghost" | "danger" }) {
   const styles = {
-    primary: "bg-indigo-600 text-white hover:bg-indigo-500",
-    ghost: "text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800",
-    danger: "text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950",
+    primary: "bg-brand-600 text-white hover:bg-brand-500 active:scale-[0.98]",
+    ghost: "text-ink underline-offset-2 hover:bg-zinc-100",
+    danger: "text-red-600 hover:bg-red-50",
   }[variant];
   return (
     <button
       type="button"
       {...props}
-      className={`rounded-lg px-4 py-2 text-sm font-medium transition disabled:opacity-60 ${styles} ${className ?? ""}`}
+      className={`rounded-xl px-5 py-3 text-[15px] font-semibold transition disabled:opacity-60 ${styles} ${className ?? ""}`}
     />
   );
 }

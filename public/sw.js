@@ -1,9 +1,9 @@
 // Family Planner service worker: makes the app installable and lets it open offline.
 // Data always comes live from Supabase; only the app's own files are cached.
-const VERSION = "v2";
+const VERSION = "v3";
 const CACHE = `family-planner-${VERSION}`;
 const BASE = new URL(self.registration.scope).pathname; // e.g. "/family-planner/"
-const SHELL = ["", "program/", "calendar/", "tasks/", "shopping/", "meals/", "inbox/", "family/", "rules/", "login/", "onboarding/"].map(
+const SHELL = ["", "program/", "map/", "calendar/", "tasks/", "shopping/", "inbox/", "family/", "rules/", "history/", "places/", "login/", "onboarding/"].map(
   (p) => BASE + p,
 );
 

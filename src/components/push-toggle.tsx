@@ -26,7 +26,7 @@ export function PushToggle() {
   };
 
   return (
-    <div className="rounded-xl border border-zinc-200 bg-white p-4 text-sm dark:border-zinc-800 dark:bg-zinc-900">
+    <div className="rounded-xl border border-zinc-200 bg-white p-4 text-sm">
       <p className="font-medium">🔔 Phone notifications</p>
       <p className="mt-1 text-zinc-500">{text[state]}</p>
       {(state === "on" || state === "off") && (

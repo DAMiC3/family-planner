@@ -74,7 +74,7 @@ export function InboxView() {
             ) : items.length === 0 ? (
               <Empty>Nothing here yet.</Empty>
             ) : (
-              <ul className="divide-y divide-zinc-100 dark:divide-zinc-800">
+              <ul className="divide-y divide-zinc-100">
                 {items.map((n) => (
                   <li key={n.id} className="flex items-start gap-3 py-3">
                     <span className="text-lg" aria-hidden>{ICONS[n.kind] ?? "🔔"}</span>
@@ -87,8 +87,8 @@ export function InboxView() {
                         else void load();
                       }}
                     >
-                      <p className={`text-sm ${n.read_at ? "text-zinc-600 dark:text-zinc-400" : "font-semibold"}`}>
-                        {!n.read_at && <span className="mr-1.5 inline-block h-2 w-2 rounded-full bg-indigo-600" aria-label="New" />}
+                      <p className={`text-sm ${n.read_at ? "text-zinc-600" : "font-semibold"}`}>
+                        {!n.read_at && <span className="mr-1.5 inline-block h-2 w-2 rounded-full bg-brand-600" aria-label="New" />}
                         {n.title}
                       </p>
                       {n.body && <p className="text-sm text-zinc-500">{n.body}</p>}

@@ -7,6 +7,7 @@ import type { FamilyContextValue } from "@/components/family-provider";
 import { getSupabase } from "@/lib/supabase/client";
 import { FieldError, check, isoDate, requiredStr, str, uuid } from "@/lib/form";
 import { isValidTimeZone, zonedLocalToUtcIso } from "@/lib/dates";
+import type { Place } from "@/lib/geo";
 import type { MealType, MemberRole, RuleArea } from "@/lib/supabase/types";
 
 export const MEAL_TYPES: MealType[] = ["breakfast", "lunch", "dinner", "snack"];
@@ -79,13 +80,19 @@ export async function leaveFamily(ctx: FamilyContextValue) {
 
 // ---------------------------------------------------------------- events
 
-export async function addEvent(ctx: FamilyContextValue, form: FormData) {
+/** Let every open screen know the calendar changed (the + sheet lives outside the pages). */
+export function announceChange() {
+  if (typeof window !== "undefined") window.dispatchEvent(new Event("planner:changed"));
+}
+
+export async function addEvent(ctx: FamilyContextValue, form: FormData, place: Place | null) {
   const tz = ctx.family.timezone;
   const isSlot = form.get("kind") === "slot";
   if (isSlot && !ctx.isParent) throw new FieldError("Only parents can add activity slots");
-  const title = requiredStr(form, "title", "Title");
+  const title = requiredStr(form, "title", "What");
+  if (!place) throw new FieldError("Add where it is");
   const date = isoDate(form, "date");
-  if (!date) throw new FieldError("Date is required");
+  if (!date) throw new FieldError("Pick a date");
   const startTime = str(form, "start_time", 5);
   const endTime = str(form, "end_time", 5);
   if ((startTime && !TIME_RE.test(startTime)) || (endTime && !TIME_RE.test(endTime))) throw new FieldError("Invalid time");
@@ -99,6 +106,10 @@ export async function addEvent(ctx: FamilyContextValue, form: FormData) {
   if (closeTime && !TIME_RE.test(closeTime)) throw new FieldError("Invalid time");
   const closesAt = isSlot && closeDate ? zonedLocalToUtcIso(closeTime ? `${closeDate}T${closeTime}` : `${closeDate}T23:59`, tz) : null;
 
+  const driverId = uuid(form, "driver_id");
+  if (driverId && !ctx.isParent) throw new FieldError("Only parents can assign drivers");
+  if (driverId && !ctx.members.some((m) => m.user_id === driverId)) throw new FieldError("That driver isn't in your family");
+
   check(
     (
       await ctx.supabase.from("events").insert({
@@ -106,19 +117,33 @@ export async function addEvent(ctx: FamilyContextValue, form: FormData) {
         kind: isSlot ? "slot" : "event",
         requests_close_at: closesAt,
         title,
-        location: str(form, "location", 200),
+        location: place.name === place.address ? place.address.slice(0, 200) : `${place.name} — ${place.address}`.slice(0, 200),
+        lat: place.lat,
+        lng: place.lng,
         description: str(form, "description", 2000),
         starts_at: startsAt,
         ends_at: endsAt,
         all_day: allDay,
         assigned_to: isSlot ? null : assignee(form, ctx),
+        driver_id: driverId,
       })
     ).error,
   );
+  announceChange();
+}
+
+/** Parents: pick who drives to an event (null = no driver). */
+export async function setDriver(ctx: FamilyContextValue, eventId: string, driverId: string | null) {
+  if (!ctx.isParent) throw new FieldError("Only parents can assign drivers");
+  check(
+    (await ctx.supabase.from("events").update({ driver_id: driverId }).eq("id", eventId).eq("family_id", ctx.family.id)).error,
+  );
+  announceChange();
 }
 
 export async function deleteEvent(ctx: FamilyContextValue, id: string) {
   check((await ctx.supabase.from("events").delete().eq("id", id).eq("family_id", ctx.family.id)).error);
+  announceChange();
 }
 
 // ---------------------------------------------------------------- tasks
@@ -251,6 +276,7 @@ export async function addMeal(ctx: FamilyContextValue, form: FormData) {
       })
     ).error,
   );
+  announceChange();
 }
 
 export async function deleteMeal(ctx: FamilyContextValue, id: string) {

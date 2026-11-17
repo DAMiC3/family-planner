@@ -81,14 +81,14 @@ export function ShoppingView() {
             {data.items.length === 0 ? (
               <Empty>The list is empty.</Empty>
             ) : (
-              <ul className="divide-y divide-zinc-100 dark:divide-zinc-800">
+              <ul className="divide-y divide-zinc-100">
                 {data.items.map((i) => (
                   <li key={i.id} className="flex items-center gap-3 py-2.5 text-sm">
                     <ActButton
                       run={async () => { await toggleShoppingItem(ctx, i.id, i.checked); await reload(); }}
                       label={i.checked ? "Untick" : "Tick"}
                       className={`flex h-6 w-6 shrink-0 items-center justify-center rounded border ${
-                        i.checked ? "border-emerald-600 bg-emerald-600 text-white" : "border-zinc-400 hover:border-indigo-500"
+                        i.checked ? "border-emerald-600 bg-emerald-600 text-white" : "border-zinc-400 hover:border-brand-500"
                       }`}
                     >
                       {i.checked ? "✓" : ""}
@@ -103,7 +103,7 @@ export function ShoppingView() {
                       className={`rounded-lg px-2 py-1 text-xs font-medium ${
                         i.checkers_url
                           ? "bg-emerald-600 text-white hover:bg-emerald-500"
-                          : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-200"
+                          : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200"
                       }`}
                     >
                       🛒 {i.checkers_url ? "Product" : "Find"}
@@ -120,7 +120,7 @@ export function ShoppingView() {
                           await reload();
                         }}
                         label={i.checkers_url ? "Change Checkers link" : "Save exact Checkers product"}
-                        className="px-1 text-zinc-400 hover:text-indigo-600"
+                        className="px-1 text-zinc-400 hover:text-brand-600"
                       >
                         🔗
                       </ActButton>

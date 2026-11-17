@@ -45,6 +45,9 @@ export type CalendarEvent = {
   kind: "event" | "slot";
   requests_close_at: string | null;
   chosen_request_id: string | null;
+  lat: number | null;
+  lng: number | null;
+  driver_id: string | null;
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -165,6 +168,29 @@ export type PushSubscriptionRow = {
   created_at: string;
 };
 
+export type SavedPlace = {
+  id: string;
+  user_id: string;
+  name: string;
+  address: string;
+  lat: number;
+  lng: number;
+  is_home: boolean;
+  created_at: string;
+};
+
+export type ChangeLogRow = {
+  id: number;
+  family_id: string;
+  table_name: string;
+  row_id: string;
+  action: "insert" | "update" | "delete";
+  changed_by: string | null;
+  changed_at: string;
+  old_data: Record<string, unknown> | null;
+  new_data: Record<string, unknown> | null;
+};
+
 export type Database = {
   family_planner: {
     Tables: {
@@ -180,7 +206,17 @@ export type Database = {
           Partial<
             Pick<
               CalendarEvent,
-              "description" | "location" | "ends_at" | "all_day" | "assigned_to" | "kind" | "requests_close_at" | "chosen_request_id"
+              | "description"
+              | "location"
+              | "ends_at"
+              | "all_day"
+              | "assigned_to"
+              | "kind"
+              | "requests_close_at"
+              | "chosen_request_id"
+              | "lat"
+              | "lng"
+              | "driver_id"
             >
           >
       >;
@@ -216,6 +252,11 @@ export type Database = {
       invites: Table<Invite, Pick<Invite, "family_id" | "email" | "role">, never>;
       notifications: Table<Notification, never, Pick<Notification, "read_at">>;
       push_subscriptions: Table<PushSubscriptionRow, never, never>;
+      saved_places: Table<
+        SavedPlace,
+        Pick<SavedPlace, "name" | "address" | "lat" | "lng"> & Partial<Pick<SavedPlace, "is_home">>
+      >;
+      change_log: Table<ChangeLogRow, never, never>;
       meals: Table<
         Meal,
         Pick<Meal, "family_id" | "date" | "title"> & Partial<Pick<Meal, "meal_type" | "notes">>

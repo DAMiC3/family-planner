@@ -1,11 +1,8 @@
 import type { Metadata, Viewport } from "next";
-import { Geist } from "next/font/google";
 import { SessionProvider } from "@/components/session-provider";
-import { ServiceWorker } from "@/components/pwa";
+import { NoZoom, ServiceWorker } from "@/components/pwa";
 import { withBase } from "@/lib/base-path";
 import "./globals.css";
-
-const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: { default: "Family Planner", template: "%s · Family Planner" },
@@ -26,19 +23,19 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
   viewportFit: "cover",
-  themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#4f46e5" },
-    { media: "(prefers-color-scheme: dark)", color: "#09090b" },
-  ],
+  themeColor: "#ffffff",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${geistSans.variable} h-full antialiased`}>
-      <body className="flex min-h-full flex-col bg-zinc-50 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100">
+    <html lang="en" className="h-full antialiased">
+      <body className="flex min-h-full flex-col bg-white text-ink">
         <SessionProvider>{children}</SessionProvider>
         <ServiceWorker />
+        <NoZoom />
       </body>
     </html>
   );

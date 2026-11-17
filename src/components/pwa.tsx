@@ -65,7 +65,7 @@ export function InstallPrompt() {
   if (standalone || dismissed || (!deferred && !ios)) return null;
 
   return (
-    <div className="flex items-start gap-3 rounded-2xl border border-indigo-200 bg-indigo-50 p-4 text-sm text-indigo-950 dark:border-indigo-900 dark:bg-indigo-950/50 dark:text-indigo-100">
+    <div className="flex items-start gap-3 rounded-2xl border border-brand-200 bg-brand-50 p-4 text-sm text-brand-950">
       <span className="text-2xl" aria-hidden>
         📲
       </span>
@@ -83,7 +83,7 @@ export function InstallPrompt() {
           {deferred && (
             <button
               type="button"
-              className="rounded-lg bg-indigo-600 px-3 py-1.5 font-medium text-white hover:bg-indigo-500"
+              className="rounded-lg bg-brand-600 px-3 py-1.5 font-medium text-white hover:bg-brand-500"
               onClick={async () => {
                 await deferred.prompt();
                 await deferred.userChoice;
@@ -93,7 +93,7 @@ export function InstallPrompt() {
               Install app
             </button>
           )}
-          <button type="button" className="rounded-lg px-3 py-1.5 text-indigo-700 dark:text-indigo-300" onClick={() => setDismissed(true)}>
+          <button type="button" className="rounded-lg px-3 py-1.5 text-brand-700" onClick={() => setDismissed(true)}>
             Not now
           </button>
         </div>
@@ -118,8 +118,22 @@ export function OfflineBanner() {
   );
   if (online) return null;
   return (
-    <div className="bg-amber-100 px-4 py-2 text-center text-sm text-amber-900 dark:bg-amber-900/40 dark:text-amber-100">
+    <div className="bg-amber-100 px-4 py-2 text-center text-sm text-amber-900">
       You&apos;re offline — changes need an internet connection.
     </div>
   );
+}
+
+/** Block pinch-zoom on iPhone (Safari ignores user-scalable=no). Maps still pinch-zoom themselves. */
+export function NoZoom() {
+  useEffect(() => {
+    const stop = (e: Event) => e.preventDefault();
+    document.addEventListener("gesturestart", stop);
+    document.addEventListener("gesturechange", stop);
+    return () => {
+      document.removeEventListener("gesturestart", stop);
+      document.removeEventListener("gesturechange", stop);
+    };
+  }, []);
+  return null;
 }

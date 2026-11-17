@@ -119,21 +119,21 @@ export function LoginForm() {
   ];
 
   return (
-    <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-      <div className={`mb-6 grid ${CODE_LOGIN ? "grid-cols-3" : "grid-cols-2"} rounded-lg bg-zinc-100 p-1 text-sm font-medium dark:bg-zinc-800`}>
+    <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
+      <div className={`mb-6 grid ${CODE_LOGIN ? "grid-cols-3" : "grid-cols-2"} rounded-lg bg-zinc-100 p-1 text-sm font-medium`}>
         {tabs.map(({ m, label }) => (
           <button
             key={m}
             type="button"
             onClick={() => switchMode(m)}
-            className={`rounded-md py-1.5 ${mode === m ? "bg-white shadow dark:bg-zinc-700" : "text-zinc-500"}`}
+            className={`rounded-md py-1.5 ${mode === m ? "bg-white shadow" : "text-zinc-500"}`}
           >
             {label}
           </button>
         ))}
       </div>
 
-      {info && <p className="mb-4 rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200">{info}</p>}
+      {info && <p className="mb-4 rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800">{info}</p>}
 
       {mode === "code" && !codeSent && (
         <form onSubmit={sendCode} className="flex flex-col gap-4">
@@ -160,7 +160,7 @@ export function LoginForm() {
             />
           </Field>
           <Button type="submit" disabled={pending}>{pending ? "Checking…" : "Sign in"}</Button>
-          <button type="button" className="text-sm text-indigo-600" onClick={() => { setCodeSent(false); setInfo(null); }}>
+          <button type="button" className="text-sm text-brand-600" onClick={() => { setCodeSent(false); setInfo(null); }}>
             Use a different email or send a new code
           </button>
         </form>
@@ -186,7 +186,7 @@ export function LoginForm() {
       )}
 
       {error && (
-        <p role="alert" className="mt-4 text-sm text-red-600 dark:text-red-400">
+        <p role="alert" className="mt-4 text-sm text-red-600">
           {error}
         </p>
       )}

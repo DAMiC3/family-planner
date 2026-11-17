@@ -42,6 +42,13 @@ export function useFamilyQuery<T>(
     void reload();
   }, [reload, familyId, depsKey]);
 
+  // Changes made from the + sheet (outside this page) refresh the page right away.
+  useEffect(() => {
+    const onChange = () => void reload();
+    window.addEventListener("planner:changed", onChange);
+    return () => window.removeEventListener("planner:changed", onChange);
+  }, [reload]);
+
   const supabase = ctx.supabase;
   const tablesKey = liveTables.join(",");
   useEffect(() => {

@@ -92,12 +92,18 @@ export function FamilyProvider({ children }: { children: ReactNode }) {
 
   if (error) {
     return (
-      <p role="alert" className="rounded-lg bg-red-50 p-4 text-sm text-red-700 dark:bg-red-950 dark:text-red-300">
+      <p role="alert" className="m-4 rounded-xl bg-red-50 p-4 text-sm text-red-700">
         Couldn&apos;t load your family: {error}
       </p>
     );
   }
-  if (!value) return <Skeleton />;
+  if (!value) {
+    return (
+      <div className="mx-auto w-full max-w-5xl px-4 pt-6">
+        <Skeleton />
+      </div>
+    );
+  }
 
   const ctx: FamilyContextValue = {
     ...value,

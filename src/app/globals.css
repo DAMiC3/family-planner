@@ -1,17 +1,61 @@
 @import "tailwindcss";
 
-@theme inline {
-  --font-sans: var(--font-geist-sans);
+/* Airbnb-inspired palette: "brand" is the coral/rose used for actions and highlights. */
+@theme {
+  --color-brand-50: #fff1f3;
+  --color-brand-100: #ffe4e9;
+  --color-brand-200: #ffccd5;
+  --color-brand-300: #ff9bae;
+  --color-brand-400: #ff6b86;
+  --color-brand-500: #e31c5f;
+  --color-brand-600: #ff385c;
+  --color-brand-700: #d70466;
+  --color-brand-800: #a0034c;
+  --color-brand-900: #6e0435;
+  --color-brand-950: #3d0220;
+  --color-ink: #222222;
+  --color-muted: #717171;
+  --color-line: #dddddd;
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
 
 :root {
-  color-scheme: light dark;
+  color-scheme: light;
 }
 
-/* Respect the notch / home bar when installed on phones */
+html {
+  /* Feel like an app: no double-tap zoom, no text auto-resizing, no rubber-band page bounce */
+  touch-action: manipulation;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  overscroll-behavior: none;
+}
+
 body {
   padding-left: env(safe-area-inset-left);
   padding-right: env(safe-area-inset-right);
-  padding-bottom: env(safe-area-inset-bottom);
   -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
+}
+
+/* iOS zooms into inputs smaller than 16px — keep every field at 16px */
+input,
+select,
+textarea {
+  font-size: 16px;
+}
+
+nav,
+button {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Leaflet map popups in the app's style */
+.leaflet-popup-content-wrapper {
+  border-radius: 12px;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
+}
+.leaflet-container {
+  font-family: var(--font-sans);
 }

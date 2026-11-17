@@ -106,7 +106,7 @@ export function TasksView() {
 function TaskList({ tasks, ctx, today, reload }: { tasks: Task[]; ctx: FamilyContextValue; today: string; reload: () => Promise<void> }) {
   const memberById = new Map(ctx.members.map((m) => [m.user_id, m]));
   return (
-    <ul className="divide-y divide-zinc-100 dark:divide-zinc-800">
+    <ul className="divide-y divide-zinc-100">
       {tasks.map((t) => {
         const who = t.assigned_to ? memberById.get(t.assigned_to) : undefined;
         const overdue = !t.completed_at && t.due_date && t.due_date < today;
@@ -116,7 +116,7 @@ function TaskList({ tasks, ctx, today, reload }: { tasks: Task[]; ctx: FamilyCon
               run={async () => { await toggleTask(ctx, t.id, Boolean(t.completed_at)); await reload(); }}
               label={t.completed_at ? "Mark not done" : "Mark done"}
               className={`flex h-6 w-6 shrink-0 items-center justify-center rounded border ${
-                t.completed_at ? "border-emerald-600 bg-emerald-600 text-white" : "border-zinc-400 hover:border-indigo-500"
+                t.completed_at ? "border-emerald-600 bg-emerald-600 text-white" : "border-zinc-400 hover:border-brand-500"
               }`}
             >
               {t.completed_at ? "✓" : ""}

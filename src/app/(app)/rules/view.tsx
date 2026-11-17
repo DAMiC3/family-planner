@@ -21,14 +21,14 @@ export function RulesView() {
         subtitle={isParent ? "Pause adding and changing things for children or others — by person, area, day, time or dates." : "Rules your parents have set for you"}
       />
       <p className="mb-4 text-sm">
-        <Link href="/family" className="text-indigo-600">← Family</Link>
+        <Link href="/family" className="text-brand-600">← Family</Link>
       </p>
       <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
         <Card title={`Rules (${visible.length})`}>
           {visible.length === 0 ? (
             <Empty>{isParent ? "No rules yet. Everyone can add and change things at any time." : "No rules apply to you."}</Empty>
           ) : (
-            <ul className="divide-y divide-zinc-100 dark:divide-zinc-800">
+            <ul className="divide-y divide-zinc-100">
               {visible.map((r) => {
                 const d = describeRule(r, members);
                 const active = ruleActiveNow(r, family.timezone);
@@ -82,10 +82,10 @@ export function RulesView() {
                 </Select>
               </Field>
               <fieldset className="text-sm">
-                <legend className="mb-1 font-medium text-zinc-700 dark:text-zinc-300">On these days (none = every day)</legend>
+                <legend className="mb-1 font-medium text-zinc-700">On these days (none = every day)</legend>
                 <div className="flex flex-wrap gap-1.5">
                   {DAY_NAMES.map((d, i) => (
-                    <label key={d} className="flex items-center gap-1 rounded-lg border border-zinc-300 px-2 py-1 has-[:checked]:border-indigo-500 has-[:checked]:bg-indigo-50 dark:border-zinc-700 dark:has-[:checked]:bg-indigo-950">
+                    <label key={d} className="flex items-center gap-1 rounded-lg border border-zinc-300 px-2 py-1 has-[:checked]:border-brand-500 has-[:checked]:bg-brand-50">
                       <input type="checkbox" name="days" value={i} className="sr-only" />
                       {d}
                     </label>
