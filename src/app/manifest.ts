@@ -9,7 +9,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "Family Planner",
     short_name: "Planner",
     description: "Calendar, chores, shopping lists and meal plans for the whole family.",
-    start_url: `${BASE_PATH}/dashboard/`,
+    start_url: `${BASE_PATH}/program/`,
     scope: `${BASE_PATH}/`,
     display: "standalone",
     orientation: "portrait",
@@ -22,9 +22,10 @@ export default function manifest(): MetadataRoute.Manifest {
       { src: `${BASE_PATH}/icons/maskable-512.png`, sizes: "512x512", type: "image/png", purpose: "maskable" },
     ],
     shortcuts: [
+      { name: "My program", url: `${BASE_PATH}/program/` },
       { name: "Shopping list", url: `${BASE_PATH}/shopping/` },
       { name: "Tasks", url: `${BASE_PATH}/tasks/` },
-      { name: "Calendar", url: `${BASE_PATH}/calendar/` },
+      { name: "Inbox", url: `${BASE_PATH}/inbox/` },
     ],
   };
 }

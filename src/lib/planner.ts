@@ -7,7 +7,7 @@ import type { FamilyContextValue } from "@/components/family-provider";
 import { getSupabase } from "@/lib/supabase/client";
 import { FieldError, check, isoDate, requiredStr, str, uuid } from "@/lib/form";
 import { isValidTimeZone, zonedLocalToUtcIso } from "@/lib/dates";
-import type { MealType } from "@/lib/supabase/types";
+import type { MealType, MemberRole, RuleArea } from "@/lib/supabase/types";
 
 export const MEAL_TYPES: MealType[] = ["breakfast", "lunch", "dinner", "snack"];
 const COLOR_RE = /^#[0-9a-fA-F]{6}$/;
@@ -58,7 +58,7 @@ export async function updateMyProfile(ctx: FamilyContextValue, form: FormData) {
 }
 
 export async function updateFamily(ctx: FamilyContextValue, form: FormData) {
-  if (ctx.me.role !== "owner") throw new FieldError("Only the family owner can do this");
+  if (!ctx.isParent) throw new FieldError("Only parents can do this");
   const name = requiredStr(form, "name", "Family name", 80);
   const tz = requiredStr(form, "timezone", "Timezone", 64);
   if (!isValidTimeZone(tz)) throw new FieldError("Unknown timezone");
@@ -81,6 +81,8 @@ export async function leaveFamily(ctx: FamilyContextValue) {
 
 export async function addEvent(ctx: FamilyContextValue, form: FormData) {
   const tz = ctx.family.timezone;
+  const isSlot = form.get("kind") === "slot";
+  if (isSlot && !ctx.isParent) throw new FieldError("Only parents can add activity slots");
   const title = requiredStr(form, "title", "Title");
   const date = isoDate(form, "date");
   if (!date) throw new FieldError("Date is required");
@@ -92,18 +94,24 @@ export async function addEvent(ctx: FamilyContextValue, form: FormData) {
   const startsAt = zonedLocalToUtcIso(allDay ? date : `${date}T${startTime}`, tz);
   const endsAt = !allDay && endTime ? zonedLocalToUtcIso(`${date}T${endTime}`, tz) : null;
   if (endsAt && endsAt < startsAt) throw new FieldError("End time must be after start time");
+  const closeDate = isoDate(form, "close_date");
+  const closeTime = str(form, "close_time", 5);
+  if (closeTime && !TIME_RE.test(closeTime)) throw new FieldError("Invalid time");
+  const closesAt = isSlot && closeDate ? zonedLocalToUtcIso(closeTime ? `${closeDate}T${closeTime}` : `${closeDate}T23:59`, tz) : null;
 
   check(
     (
       await ctx.supabase.from("events").insert({
         family_id: ctx.family.id,
+        kind: isSlot ? "slot" : "event",
+        requests_close_at: closesAt,
         title,
         location: str(form, "location", 200),
         description: str(form, "description", 2000),
         starts_at: startsAt,
         ends_at: endsAt,
         all_day: allDay,
-        assigned_to: assignee(form, ctx),
+        assigned_to: isSlot ? null : assignee(form, ctx),
       })
     ).error,
   );
@@ -154,14 +162,49 @@ export async function deleteTask(ctx: FamilyContextValue, id: string) {
 // ---------------------------------------------------------------- shopping
 
 export async function addShoppingItem(ctx: FamilyContextValue, listId: string, form: FormData) {
+  const name = requiredStr(form, "name", "Item");
+  // Reuse the Checkers product link from the last time this item was on the list.
+  const { data: previous } = await ctx.supabase
+    .from("shopping_items")
+    .select("checkers_url")
+    .eq("family_id", ctx.family.id)
+    .ilike("name", name.replace(/[%_\\]/g, (c) => `\\${c}`))
+    .not("checkers_url", "is", null)
+    .order("created_at", { ascending: false })
+    .limit(1);
   check(
     (
       await ctx.supabase.from("shopping_items").insert({
         family_id: ctx.family.id,
         list_id: listId,
-        name: requiredStr(form, "name", "Item"),
+        name,
         quantity: str(form, "quantity", 50),
+        checkers_url: previous?.[0]?.checkers_url ?? null,
       })
+    ).error,
+  );
+}
+
+const CHECKERS_RE = /^https:\/\/(www\.|shop\.)?checkers\.co\.za\/\S*$/;
+
+/** Checkers search link for an item name. */
+export function checkersSearchUrl(name: string) {
+  return `https://www.checkers.co.za/search?q=${encodeURIComponent(name)}`;
+}
+
+/** Save (or clear, with an empty string) the exact Checkers product link for an item. */
+export async function setCheckersLink(ctx: FamilyContextValue, id: string, url: string) {
+  const trimmed = url.trim();
+  if (trimmed && (!CHECKERS_RE.test(trimmed) || trimmed.length > 500)) {
+    throw new FieldError("Paste a link that starts with https://www.checkers.co.za/");
+  }
+  check(
+    (
+      await ctx.supabase
+        .from("shopping_items")
+        .update({ checkers_url: trimmed || null })
+        .eq("id", id)
+        .eq("family_id", ctx.family.id)
     ).error,
   );
 }
@@ -212,4 +255,140 @@ export async function addMeal(ctx: FamilyContextValue, form: FormData) {
 
 export async function deleteMeal(ctx: FamilyContextValue, id: string) {
   check((await ctx.supabase.from("meals").delete().eq("id", id).eq("family_id", ctx.family.id)).error);
+}
+
+// ---------------------------------------------------------------- activity slots
+
+export async function addRequest(ctx: FamilyContextValue, eventId: string, form: FormData) {
+  check(
+    (
+      await ctx.supabase.from("activity_requests").insert({
+        family_id: ctx.family.id,
+        event_id: eventId,
+        title: requiredStr(form, "title", "Idea"),
+        notes: str(form, "notes", 1000),
+      })
+    ).error,
+  );
+}
+
+export async function deleteRequest(ctx: FamilyContextValue, id: string) {
+  check((await ctx.supabase.from("activity_requests").delete().eq("id", id).eq("family_id", ctx.family.id)).error);
+}
+
+export async function toggleVote(ctx: FamilyContextValue, requestId: string, voted: boolean) {
+  const q = voted
+    ? ctx.supabase.from("activity_votes").delete().eq("request_id", requestId).eq("user_id", ctx.userId)
+    : ctx.supabase.from("activity_votes").insert({ request_id: requestId, family_id: ctx.family.id });
+  check((await q).error);
+}
+
+export async function chooseRequest(ctx: FamilyContextValue, eventId: string, requestId: string | null) {
+  if (!ctx.isParent) throw new FieldError("Only parents can decide");
+  check(
+    (await ctx.supabase.from("events").update({ chosen_request_id: requestId }).eq("id", eventId).eq("family_id", ctx.family.id))
+      .error,
+  );
+}
+
+// ---------------------------------------------------------------- rules (parents)
+
+const TIME_OR_NULL = (v: string | null) => {
+  if (v && !TIME_RE.test(v)) throw new FieldError("Invalid time");
+  return v;
+};
+
+export async function addRule(ctx: FamilyContextValue, form: FormData) {
+  if (!ctx.isParent) throw new FieldError("Only parents can add rules");
+  const who = String(form.get("who") ?? "all");
+  let target_user: string | null = null;
+  let target_role: MemberRole | null = null;
+  if (who === "role:child") target_role = "child";
+  else if (who === "role:other") target_role = "other";
+  else if (who.startsWith("user:")) {
+    target_user = who.slice(5);
+    const m = ctx.members.find((x) => x.user_id === target_user);
+    if (!m) throw new FieldError("That person isn't in your family");
+    if (m.role === "parent") throw new FieldError("Rules don't apply to parents");
+  }
+  const area = String(form.get("area") ?? "everything") as RuleArea;
+  const days = form.getAll("days").map(Number).filter((d) => Number.isInteger(d) && d >= 0 && d <= 6);
+  const start_time = TIME_OR_NULL(str(form, "start_time", 5));
+  const end_time = TIME_OR_NULL(str(form, "end_time", 5));
+  if ((start_time === null) !== (end_time === null)) throw new FieldError("Set both a start and an end time, or neither");
+  const start_date = isoDate(form, "start_date");
+  const end_date = isoDate(form, "end_date");
+  if (start_date && end_date && end_date < start_date) throw new FieldError("End date is before start date");
+
+  check(
+    (
+      await ctx.supabase.from("member_rules").insert({
+        family_id: ctx.family.id,
+        target_user,
+        target_role,
+        area,
+        days: days.length && days.length < 7 ? days : null,
+        start_time,
+        end_time,
+        start_date,
+        end_date,
+        note: str(form, "note", 200),
+      })
+    ).error,
+  );
+  await ctx.reloadFamily();
+}
+
+export async function deleteRule(ctx: FamilyContextValue, id: string) {
+  check((await ctx.supabase.from("member_rules").delete().eq("id", id).eq("family_id", ctx.family.id)).error);
+  await ctx.reloadFamily();
+}
+
+// ---------------------------------------------------------------- members, invites (parents)
+
+export async function setMemberRole(ctx: FamilyContextValue, userId: string, role: MemberRole) {
+  check(
+    (await ctx.supabase.from("family_members").update({ role }).eq("family_id", ctx.family.id).eq("user_id", userId)).error,
+  );
+  await ctx.reloadFamily();
+}
+
+export async function removeMember(ctx: FamilyContextValue, userId: string) {
+  check((await ctx.supabase.from("family_members").delete().eq("family_id", ctx.family.id).eq("user_id", userId)).error);
+  await ctx.reloadFamily();
+}
+
+export async function inviteByEmail(ctx: FamilyContextValue, form: FormData) {
+  const email = requiredStr(form, "email", "Email", 254).toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new FieldError("Enter a valid email address");
+  const role = String(form.get("role") ?? "other") as MemberRole;
+  if (!["parent", "child", "other"].includes(role)) throw new FieldError("Pick a role");
+  const { error } = await ctx.supabase.from("invites").insert({ family_id: ctx.family.id, email, role });
+  if (error?.code === "23505") throw new FieldError("That person already has a pending invite");
+  check(error);
+}
+
+export async function revokeInvite(ctx: FamilyContextValue, id: string) {
+  check((await ctx.supabase.from("invites").delete().eq("id", id).eq("family_id", ctx.family.id)).error);
+}
+
+export async function acceptInvite(inviteId: string, displayName: string) {
+  const name = displayName.trim();
+  if (!name || name.length > 50) throw new FieldError("Enter your name (max 50 characters)");
+  check((await getSupabase().rpc("accept_invite", { p_invite_id: inviteId, p_display_name: name })).error);
+}
+
+export async function declineInvite(inviteId: string) {
+  check((await getSupabase().from("invites").delete().eq("id", inviteId)).error);
+}
+
+// ---------------------------------------------------------------- inbox
+
+export async function markRead(ids: string[]) {
+  if (!ids.length) return;
+  check((await getSupabase().from("notifications").update({ read_at: new Date().toISOString() }).in("id", ids)).error);
+}
+
+export async function deleteNotification(id: string) {
+  check((await getSupabase().from("notifications").delete().eq("id", id)).error);
 }

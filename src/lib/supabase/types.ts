@@ -2,7 +2,8 @@
 // Mirrors supabase/migrations/20261116120000_family_planner_init.sql.
 // Update this file whenever you add a migration.
 
-export type MemberRole = "owner" | "adult" | "child";
+export type MemberRole = "parent" | "child" | "other";
+export type RuleArea = "everything" | "events" | "tasks" | "shopping" | "meals" | "requests";
 export type MealType = "breakfast" | "lunch" | "dinner" | "snack";
 
 type Table<Row, Insert, Update = Partial<Insert>> = {
@@ -41,6 +42,9 @@ export type CalendarEvent = {
   ends_at: string | null;
   all_day: boolean;
   assigned_to: string | null;
+  kind: "event" | "slot";
+  requests_close_at: string | null;
+  chosen_request_id: string | null;
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -76,6 +80,7 @@ export type ShoppingItem = {
   name: string;
   quantity: string | null;
   checked: boolean;
+  checkers_url: string | null;
   added_by: string;
   created_at: string;
 };
@@ -88,6 +93,75 @@ export type Meal = {
   title: string;
   notes: string | null;
   created_by: string;
+  created_at: string;
+};
+
+export type ActivityRequest = {
+  id: string;
+  family_id: string;
+  event_id: string;
+  title: string;
+  notes: string | null;
+  requested_by: string;
+  created_at: string;
+};
+
+export type ActivityVote = { request_id: string; user_id: string; family_id: string; created_at: string };
+
+export type MemberRule = {
+  id: string;
+  family_id: string;
+  target_user: string | null;
+  target_role: MemberRole | null;
+  area: RuleArea;
+  days: number[] | null;
+  start_time: string | null;
+  end_time: string | null;
+  start_date: string | null;
+  end_date: string | null;
+  note: string | null;
+  created_by: string | null;
+  created_at: string;
+};
+
+export type Invite = {
+  id: string;
+  family_id: string;
+  email: string;
+  role: MemberRole;
+  invited_by: string | null;
+  created_at: string;
+  accepted_at: string | null;
+};
+
+export type MyInvite = {
+  id: string;
+  family_id: string;
+  family_name: string;
+  role: MemberRole;
+  invited_by_name: string | null;
+  created_at: string;
+};
+
+export type Notification = {
+  id: string;
+  user_id: string;
+  family_id: string | null;
+  kind: string;
+  title: string;
+  body: string | null;
+  url: string | null;
+  created_at: string;
+  read_at: string | null;
+};
+
+export type PushSubscriptionRow = {
+  id: string;
+  user_id: string;
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+  user_agent: string | null;
   created_at: string;
 };
 
@@ -104,7 +178,10 @@ export type Database = {
         CalendarEvent,
         Pick<CalendarEvent, "family_id" | "title" | "starts_at"> &
           Partial<
-            Pick<CalendarEvent, "description" | "location" | "ends_at" | "all_day" | "assigned_to">
+            Pick<
+              CalendarEvent,
+              "description" | "location" | "ends_at" | "all_day" | "assigned_to" | "kind" | "requests_close_at" | "chosen_request_id"
+            >
           >
       >;
       tasks: Table<
@@ -118,8 +195,27 @@ export type Database = {
       shopping_items: Table<
         ShoppingItem,
         Pick<ShoppingItem, "list_id" | "family_id" | "name"> &
-          Partial<Pick<ShoppingItem, "quantity" | "checked">>
+          Partial<Pick<ShoppingItem, "quantity" | "checked" | "checkers_url">>
       >;
+      activity_requests: Table<
+        ActivityRequest,
+        Pick<ActivityRequest, "family_id" | "event_id" | "title"> & Partial<Pick<ActivityRequest, "notes">>,
+        Partial<Pick<ActivityRequest, "title" | "notes">>
+      >;
+      activity_votes: Table<ActivityVote, Pick<ActivityVote, "request_id" | "family_id">, never>;
+      member_rules: Table<
+        MemberRule,
+        Pick<MemberRule, "family_id"> &
+          Partial<
+            Pick<
+              MemberRule,
+              "target_user" | "target_role" | "area" | "days" | "start_time" | "end_time" | "start_date" | "end_date" | "note"
+            >
+          >
+      >;
+      invites: Table<Invite, Pick<Invite, "family_id" | "email" | "role">, never>;
+      notifications: Table<Notification, never, Pick<Notification, "read_at">>;
+      push_subscriptions: Table<PushSubscriptionRow, never, never>;
       meals: Table<
         Meal,
         Pick<Meal, "family_id" | "date" | "title"> & Partial<Pick<Meal, "meal_type" | "notes">>
@@ -131,9 +227,17 @@ export type Database = {
       join_family: { Args: { p_invite_code: string; p_display_name: string }; Returns: Family };
       regenerate_invite_code: { Args: { p_family_id: string }; Returns: string };
       is_family_member: { Args: { p_family_id: string }; Returns: boolean };
-      is_family_owner: { Args: { p_family_id: string }; Returns: boolean };
+      is_family_parent: { Args: { p_family_id: string }; Returns: boolean };
+      can_write: { Args: { p_family_id: string; p_area: RuleArea }; Returns: boolean };
+      my_invites: { Args: Record<string, never>; Returns: MyInvite[] };
+      accept_invite: { Args: { p_invite_id: string; p_display_name: string }; Returns: Family };
+      save_push_subscription: {
+        Args: { p_endpoint: string; p_p256dh: string; p_auth: string; p_user_agent: string };
+        Returns: undefined;
+      };
+      vapid_public_key: { Args: Record<string, never>; Returns: string | null };
     };
-    Enums: { member_role: MemberRole; meal_type: MealType };
+    Enums: { member_role: MemberRole; meal_type: MealType; rule_area: RuleArea };
     CompositeTypes: Record<string, never>;
   };
 };

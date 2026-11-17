@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ActionForm } from "@/components/action-form";
+import { InviteList } from "@/components/invite-list";
 import { useSession } from "@/components/session-provider";
 import { TimezoneInput } from "@/components/timezone-input";
 import { Card, Field, Input, Skeleton } from "@/components/ui";
@@ -25,10 +26,10 @@ export default function OnboardingPage() {
       .from("family_members")
       .select("family_id", { count: "exact", head: true })
       .eq("user_id", session.user.id)
-      .then(({ count }) => (count ? router.replace("/dashboard") : setChecked(true)));
+      .then(({ count }) => (count ? router.replace("/program") : setChecked(true)));
   }, [loading, session, router]);
 
-  const done = async () => router.replace("/dashboard");
+  const done = async () => router.replace("/program");
 
   return (
     <main className="mx-auto w-full max-w-2xl px-6 py-16">
@@ -38,6 +39,9 @@ export default function OnboardingPage() {
         <Skeleton />
       ) : (
         <div className="grid gap-6 sm:grid-cols-2">
+          <div className="sm:col-span-2">
+            <InviteList onAccepted={done} />
+          </div>
           <Card title="Start a new family">
             <ActionForm onSubmit={async (f) => { await createFamily(f); await done(); }} submitLabel="Create family">
               <Field label="Family name">
@@ -51,7 +55,7 @@ export default function OnboardingPage() {
           </Card>
           <Card title="Join a family">
             <ActionForm onSubmit={async (f) => { await joinFamily(f); await done(); }} submitLabel="Join family">
-              <Field label="Invite code">
+              <Field label="Family code">
                 <Input name="invite_code" placeholder="ABCD2345" maxLength={20} className="uppercase" required />
               </Field>
               <Field label="Your name">

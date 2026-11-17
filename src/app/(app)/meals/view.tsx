@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { ActButton, ActionForm, Button } from "@/components/action-form";
 import { useFamily } from "@/components/family-provider";
-import { Card, Field, Input, PageHeader, Select, Skeleton } from "@/components/ui";
+import { Card, Field, Input, PageHeader, RestrictedNotice, Select, Skeleton } from "@/components/ui";
 import { addDays, formatDay, startOfWeek, todayInZone } from "@/lib/dates";
 import { check } from "@/lib/form";
 import { MEAL_TYPES, addMeal, deleteMeal } from "@/lib/planner";
@@ -78,7 +78,8 @@ export function MealsView() {
         </Card>
 
         <Card title="Add meal">
-          <ActionForm onSubmit={async (f) => { await addMeal(ctx, f); await reload(); }} submitLabel="Add meal" key={weekStart}>
+          <RestrictedNotice rule={ctx.blockedBy("meals")} what="meals" />
+          {!ctx.blockedBy("meals") && <ActionForm onSubmit={async (f) => { await addMeal(ctx, f); await reload(); }} submitLabel="Add meal" key={weekStart}>
             <Field label="Meal">
               <Input name="title" required maxLength={200} placeholder="Spaghetti bolognese" />
             </Field>
@@ -100,7 +101,7 @@ export function MealsView() {
                 ))}
               </Select>
             </Field>
-          </ActionForm>
+          </ActionForm>}
         </Card>
       </div>
     </>

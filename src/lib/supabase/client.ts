@@ -22,3 +22,8 @@ export function getSupabase(): DB {
   }
   return client;
 }
+
+/** Realtime channel names must be unique per subscriber, or a second subscriber reuses the first's channel. */
+export function channelName(base: string) {
+  return `${base}-${Math.random().toString(36).slice(2, 10)}`;
+}

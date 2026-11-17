@@ -17,7 +17,7 @@ export function LoginForm() {
   const router = useRouter();
 
   useEffect(() => {
-    if (session) router.replace("/dashboard");
+    if (session) router.replace("/program");
   }, [session, router]);
 
   async function submit(e: FormEvent<HTMLFormElement>) {
@@ -35,7 +35,7 @@ export function LoginForm() {
       if (mode === "in") {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) return setError(error.message);
-        router.replace("/dashboard");
+        router.replace("/program");
       } else {
         const { data, error } = await supabase.auth.signUp({
           email,

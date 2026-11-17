@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useFamily, type FamilyContextValue } from "@/components/family-provider";
+import { channelName } from "@/lib/supabase/client";
 
-type LiveTable = "events" | "tasks" | "shopping_items" | "meals";
+type LiveTable = "events" | "tasks" | "shopping_items" | "meals" | "activity_requests" | "activity_votes";
 
 /**
  * Runs `query` for the current family and re-runs it whenever `deps` change or
@@ -45,7 +46,7 @@ export function useFamilyQuery<T>(
   const tablesKey = liveTables.join(",");
   useEffect(() => {
     if (!tablesKey) return;
-    const channel = supabase.channel(`family-${familyId}-${tablesKey}`);
+    const channel = supabase.channel(channelName(`family-${familyId}-${tablesKey}`));
     for (const table of tablesKey.split(",")) {
       channel.on(
         "postgres_changes",

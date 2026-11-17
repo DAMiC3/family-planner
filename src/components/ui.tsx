@@ -68,3 +68,23 @@ export function Avatar({ name, color }: { name: string; color: string }) {
     </span>
   );
 }
+
+/** Explains that a parent's rule is stopping you from changing this right now. */
+export function RestrictedNotice({ rule, what }: { rule: { note: string | null; end_time: string | null } | undefined; what: string }) {
+  if (!rule) return null;
+  return (
+    <div className="mb-4 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
+      🔒 A parent has paused {what} for you right now
+      {rule.end_time ? ` (until ${rule.end_time.slice(0, 5)})` : ""}.{rule.note ? ` “${rule.note}”` : ""}
+    </div>
+  );
+}
+
+export function RoleBadge({ role }: { role: string }) {
+  const styles: Record<string, string> = {
+    parent: "bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300",
+    child: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300",
+    other: "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300",
+  };
+  return <span className={`rounded-full px-2 py-0.5 text-xs font-medium capitalize ${styles[role] ?? styles.other}`}>{role}</span>;
+}

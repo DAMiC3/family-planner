@@ -2,7 +2,7 @@
 
 import { ActButton, ActionForm } from "@/components/action-form";
 import { useFamily, type FamilyContextValue } from "@/components/family-provider";
-import { Avatar, Card, Empty, Field, Input, PageHeader, Select, Skeleton } from "@/components/ui";
+import { Avatar, Card, Empty, Field, Input, PageHeader, RestrictedNotice, Select, Skeleton } from "@/components/ui";
 import { formatDay, todayInZone } from "@/lib/dates";
 import { check } from "@/lib/form";
 import { addTask, deleteTask, toggleTask } from "@/lib/planner";
@@ -54,7 +54,8 @@ export function TasksView() {
 
         <div className="space-y-6">
           <Card title="Add task">
-            <ActionForm onSubmit={async (f) => { await addTask(ctx, f); await reload(); }} submitLabel="Add task">
+            <RestrictedNotice rule={ctx.blockedBy("tasks")} what="tasks" />
+            {!ctx.blockedBy("tasks") && <ActionForm onSubmit={async (f) => { await addTask(ctx, f); await reload(); }} submitLabel="Add task">
               <Field label="Task">
                 <Input name="title" required maxLength={200} placeholder="Empty the dishwasher" />
               </Field>
@@ -76,7 +77,7 @@ export function TasksView() {
                   <Input name="points" type="number" min={0} max={1000} defaultValue={0} />
                 </Field>
               </div>
-            </ActionForm>
+            </ActionForm>}
           </Card>
           {points.size > 0 && (
             <Card title="Points">
@@ -128,9 +129,11 @@ function TaskList({ tasks, ctx, today, reload }: { tasks: Task[]; ctx: FamilyCon
               </span>
             )}
             {who && <Avatar name={who.display_name} color={who.color} />}
-            <ActButton run={async () => { await deleteTask(ctx, t.id); await reload(); }} label="Delete task" className="px-1 text-zinc-400 hover:text-red-600">
-              ✕
-            </ActButton>
+            {!ctx.blockedBy("tasks") && (
+              <ActButton run={async () => { await deleteTask(ctx, t.id); await reload(); }} label="Delete task" className="px-1 text-zinc-400 hover:text-red-600">
+                ✕
+              </ActButton>
+            )}
           </li>
         );
       })}
