@@ -97,16 +97,15 @@ export function MapView() {
         if (e.lat == null || e.lng == null) continue;
         const who = e.assigned_to ? memberById.get(e.assigned_to) : undefined;
         const driver = e.driver_id ? memberById.get(e.driver_id) : undefined;
-        const color = who?.color ?? "#FF385C";
+        // Same solid red pin as the Map tab icon; ❗ means nobody is driving yet.
         const icon = L.divIcon({
           className: "",
-          html: `<div style="position:relative;width:34px;height:42px">
-            <div style="position:absolute;inset:0 0 8px 0;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:${color};border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.3)"></div>
-            <div style="position:absolute;top:6px;left:0;right:0;text-align:center;color:#fff;font:700 13px sans-serif">${esc((who?.display_name ?? "★").slice(0, 1).toUpperCase())}</div>
-            ${driver ? "" : `<div style="position:absolute;top:-6px;right:-6px;font-size:14px">❗</div>`}
+          html: `<div style="position:relative;width:30px;height:40px;filter:drop-shadow(0 2px 3px rgba(0,0,0,.35))">
+            <svg width="30" height="40" viewBox="0 0 24 32" aria-hidden="true"><circle cx="12" cy="11.6" r="5" fill="#fff"/><path fill-rule="evenodd" fill="#FF385C" stroke="#fff" stroke-width="1.2" d="M12 0C5.37 0 0 5.2 0 11.6 0 20.3 12 32 12 32s12-11.7 12-20.4C24 5.2 18.63 0 12 0Zm0 6.8a4.8 4.8 0 1 1 0 9.6 4.8 4.8 0 0 1 0-9.6Z"/></svg>
+            ${driver ? "" : `<div style="position:absolute;top:-8px;right:-8px;font-size:14px">❗</div>`}
           </div>`,
-          iconSize: [34, 42],
-          iconAnchor: [17, 40],
+          iconSize: [30, 40],
+          iconAnchor: [15, 40],
           popupAnchor: [0, -36],
         });
         const when = e.all_day ? formatDay(dateInZone(new Date(e.starts_at), tz)) : `${formatDay(dateInZone(new Date(e.starts_at), tz))} ${formatTime(e.starts_at, tz)}`;
@@ -118,7 +117,7 @@ export function MapView() {
         points.push([e.lat, e.lng]);
       }
       if (points.length === 1) m.setView(points[0], 14);
-      else if (points.length > 1) m.fitBounds(L.latLngBounds(points), { padding: [40, 40], maxZoom: 15 });
+      else if (points.length > 1) m.fitBounds(L.latLngBounds(points), { paddingTopLeft: [40, 90], paddingBottomRight: [40, 50], maxZoom: 15 });
     });
   }, [ready, data, home, members, tz]);
 
